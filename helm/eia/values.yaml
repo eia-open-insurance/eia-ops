@@ -1,0 +1,209 @@
+# EIA Open Insurance - local Helm values.
+#
+# Every service exposes its container/service port and its own image tag. Tags fall back to
+# global.imageTag only when a per-service tag is left empty.
+#
+# Local-only credentials. Override with --set or provide an existing Secret; never commit a
+# real password. See ../../README.md ("Secrets").
+
+namespace: eia-local
+
+global:
+  imageTag: local
+  imagePullPolicy: IfNotPresent
+  javaToolOptions: "-Xms32m -Xmx256m -XX:+UseSerialGC"
+
+replicaCount: 1
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 256Mi
+  limits:
+    cpu: "1"
+    memory: 512Mi
+
+postgres:
+  image:
+    repository: postgres
+    tag: "17-alpine"
+  servicePort: 5432
+  auth:
+    username: eia
+    password: replace-me-local-only
+    database: eia
+    existingSecret: ""
+  persistence:
+    size: 1Gi
+    storageClassName: ""
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+platform:
+  gateway:
+    image:
+      repository: eia/gateway
+      tag: local
+    port: 8080
+  auth:
+    image:
+      repository: eia/auth
+      tag: local
+    port: 9000
+  config:
+    image:
+      repository: eia/config
+      tag: local
+    port: 8888
+  lineage:
+    image:
+      repository: eia/lineage
+      tag: local
+    port: 8101
+
+verticals:
+  party:
+    expert:
+      image:
+        repository: eia/party-expert
+        tag: local
+      port: 8081
+      database: eia_party
+    domain:
+      image:
+        repository: eia/party-domain
+        tag: local
+      port: 8082
+  policy:
+    expert:
+      image:
+        repository: eia/policy-expert
+        tag: local
+      port: 8083
+      database: eia_policy
+    domain:
+      image:
+        repository: eia/policy-domain
+        tag: local
+      port: 8084
+  contract:
+    expert:
+      image:
+        repository: eia/contract-expert
+        tag: local
+      port: 8085
+      database: eia_contract
+    domain:
+      image:
+        repository: eia/contract-domain
+        tag: local
+      port: 8086
+  direct-claims:
+    expert:
+      image:
+        repository: eia/direct-claims-expert
+        tag: local
+      port: 8087
+      database: eia_direct
+    domain:
+      image:
+        repository: eia/direct-claims-domain
+        tag: local
+      port: 8088
+  assumed-claims:
+    expert:
+      image:
+        repository: eia/assumed-claims-expert
+        tag: local
+      port: 8089
+      database: eia_assumed
+    domain:
+      image:
+        repository: eia/assumed-claims-domain
+        tag: local
+      port: 8090
+  cession:
+    expert:
+      image:
+        repository: eia/cession-expert
+        tag: local
+      port: 8091
+      database: eia_cession
+    domain:
+      image:
+        repository: eia/cession-domain
+        tag: local
+      port: 8092
+  retrocession:
+    expert:
+      image:
+        repository: eia/retrocession-expert
+        tag: local
+      port: 8093
+      database: eia_retrocession
+    domain:
+      image:
+        repository: eia/retrocession-domain
+        tag: local
+      port: 8094
+  document:
+    expert:
+      image:
+        repository: eia/document-expert
+        tag: local
+      port: 8095
+      database: eia_document
+    domain:
+      image:
+        repository: eia/document-domain
+        tag: local
+      port: 8096
+  payment:
+    expert:
+      image:
+        repository: eia/payment-expert
+        tag: local
+      port: 8097
+      database: eia_payment
+    domain:
+      image:
+        repository: eia/payment-domain
+        tag: local
+      port: 8098
+  notifications:
+    expert:
+      image:
+        repository: eia/notifications-expert
+        tag: local
+      port: 8099
+      database: eia_notifications
+    domain:
+      image:
+        repository: eia/notifications-domain
+        tag: local
+      port: 8100
+
+shell:
+  image:
+    repository: eia/shell
+    tag: local
+  port: 80
+  resources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+ingress:
+  enabled: true
+  className: nginx
+  host: eia.local
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: 16m

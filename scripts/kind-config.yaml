@@ -1,0 +1,19 @@
+# kind cluster used by scripts/deploy-kind.ps1.
+# Host ports 18080/18443 avoid clashing with the Compose stack (3000, 8080-8101, 9000).
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+  - role: control-plane
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "ingress-ready=true"
+    extraPortMappings:
+      - containerPort: 80
+        hostPort: 18080
+        protocol: TCP
+      - containerPort: 443
+        hostPort: 18443
+        protocol: TCP

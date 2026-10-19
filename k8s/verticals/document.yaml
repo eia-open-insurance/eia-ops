@@ -1,0 +1,203 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eia-document-expert
+  namespace: eia-local
+  labels:
+    app.kubernetes.io/name: eia-document-expert
+    app.kubernetes.io/component: vertical-expert
+    app.kubernetes.io/part-of: eia-open-insurance
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: eia-document-expert
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: eia-document-expert
+        app.kubernetes.io/component: vertical-expert
+        app.kubernetes.io/part-of: eia-open-insurance
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: document-expert
+          image: eia/document-expert:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8095
+          env:
+            - name: JAVA_TOOL_OPTIONS
+              value: "-Xms32m -Xmx256m -XX:+UseSerialGC"
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://eia-postgres:5432/eia_document"
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: eia-db
+                  key: POSTGRES_USER
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: eia-db
+                  key: POSTGRES_PASSWORD
+            - name: SPRING_SQL_INIT_MODE
+              value: "always"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 5
+            failureThreshold: 36
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 20
+            failureThreshold: 3
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: eia-document-expert
+  namespace: eia-local
+  labels:
+    app.kubernetes.io/name: eia-document-expert
+    app.kubernetes.io/component: vertical-expert
+    app.kubernetes.io/part-of: eia-open-insurance
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: eia-document-expert
+  ports:
+    - name: http
+      port: 8095
+      targetPort: http
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eia-document-domain
+  namespace: eia-local
+  labels:
+    app.kubernetes.io/name: eia-document-domain
+    app.kubernetes.io/component: vertical-domain
+    app.kubernetes.io/part-of: eia-open-insurance
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: eia-document-domain
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: eia-document-domain
+        app.kubernetes.io/component: vertical-domain
+        app.kubernetes.io/part-of: eia-open-insurance
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: document-domain
+          image: eia/document-domain:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8096
+          env:
+            - name: JAVA_TOOL_OPTIONS
+              value: "-Xms32m -Xmx256m -XX:+UseSerialGC"
+            - name: SPRING_APPLICATION_JSON
+              value: '{"eia":{"document":{"expert-url":"http://eia-document-expert:8095"}}}'
+          resources:
+            requests:
+              cpu: 50m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 5
+            failureThreshold: 36
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 20
+            failureThreshold: 3
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: eia-document-domain
+  namespace: eia-local
+  labels:
+    app.kubernetes.io/name: eia-document-domain
+    app.kubernetes.io/component: vertical-domain
+    app.kubernetes.io/part-of: eia-open-insurance
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: eia-document-domain
+  ports:
+    - name: http
+      port: 8096
+      targetPort: http
+      protocol: TCP

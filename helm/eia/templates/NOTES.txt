@@ -1,0 +1,32 @@
+EIA Open Insurance is installed in namespace {{ .Values.namespace }}.
+
+The namespace must exist before install; use --create-namespace:
+  helm upgrade --install eia helm/eia --namespace {{ .Values.namespace }} --create-namespace
+
+Images:
+{{- range $name, $service := .Values.platform }}
+  eia/{{ $name }}:{{ default $.Values.global.imageTag $service.image.tag }}
+{{- end }}
+{{- range $vertical, $tiers := .Values.verticals }}
+  {{ include "eia.image" (dict "root" $ "image" $tiers.expert.image) }}
+  {{ include "eia.image" (dict "root" $ "image" $tiers.domain.image) }}
+{{- end }}
+  {{ include "eia.image" (dict "root" . "image" .Values.shell.image) }}
+  {{ printf "%s:%s" .Values.postgres.image.repository .Values.postgres.image.tag }}
+
+Check rollout:
+  kubectl -n {{ .Values.namespace }} get deploy,svc,pods
+
+{{- if .Values.ingress.enabled }}
+
+The Ingress expects host "{{ .Values.ingress.host }}". Point it at the ingress controller:
+  kind:     add "127.0.0.1 {{ .Values.ingress.host }}" to your hosts file (with the kind port mapping)
+  minikube: add "$(minikube ip) {{ .Values.ingress.host }}" to your hosts file
+
+Without an ingress controller, port-forward the entry points:
+  kubectl -n {{ .Values.namespace }} port-forward svc/eia-shell 3000:{{ .Values.shell.port }}
+  kubectl -n {{ .Values.namespace }} port-forward svc/eia-gateway 8080:{{ (.Values.platform.gateway).port }}
+{{- end }}
+
+Health endpoints use Spring Boot Actuator at /actuator/health on each service port.
+This chart is a local single-node deployment. It is not the production gate evidence (SPEC 17.10).

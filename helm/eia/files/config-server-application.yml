@@ -1,0 +1,5 @@
+# Local placeholder served by the native Spring Cloud Config Server.
+# The column is intentionally empty: no hosted config repository is used in local deployment.
+eia:
+  config:
+    source: local-placeholder

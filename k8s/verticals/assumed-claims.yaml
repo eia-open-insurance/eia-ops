@@ -1,0 +1,203 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eia-assumed-claims-expert
+  namespace: eia-local
+  labels:
+    app.kubernetes.io/name: eia-assumed-claims-expert
+    app.kubernetes.io/component: vertical-expert
+    app.kubernetes.io/part-of: eia-open-insurance
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: eia-assumed-claims-expert
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: eia-assumed-claims-expert
+        app.kubernetes.io/component: vertical-expert
+        app.kubernetes.io/part-of: eia-open-insurance
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: assumed-claims-expert
+          image: eia/assumed-claims-expert:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8089
+          env:
+            - name: JAVA_TOOL_OPTIONS
+              value: "-Xms32m -Xmx256m -XX:+UseSerialGC"
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://eia-postgres:5432/eia_assumed"
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: eia-db
+                  key: POSTGRES_USER
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: eia-db
+                  key: POSTGRES_PASSWORD
+            - name: SPRING_SQL_INIT_MODE
+              value: "always"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 5
+            failureThreshold: 36
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 20
+            failureThreshold: 3
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: eia-assumed-claims-expert
+  namespace: eia-local
+  labels:
+    app.kubernetes.io/name: eia-assumed-claims-expert
+    app.kubernetes.io/component: vertical-expert
+    app.kubernetes.io/part-of: eia-open-insurance
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: eia-assumed-claims-expert
+  ports:
+    - name: http
+      port: 8089
+      targetPort: http
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eia-assumed-claims-domain
+  namespace: eia-local
+  labels:
+    app.kubernetes.io/name: eia-assumed-claims-domain
+    app.kubernetes.io/component: vertical-domain
+    app.kubernetes.io/part-of: eia-open-insurance
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: eia-assumed-claims-domain
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: eia-assumed-claims-domain
+        app.kubernetes.io/component: vertical-domain
+        app.kubernetes.io/part-of: eia-open-insurance
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: assumed-claims-domain
+          image: eia/assumed-claims-domain:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8090
+          env:
+            - name: JAVA_TOOL_OPTIONS
+              value: "-Xms32m -Xmx256m -XX:+UseSerialGC"
+            - name: SPRING_APPLICATION_JSON
+              value: '{"eia":{"assumed-claims":{"expert-url":"http://eia-assumed-claims-expert:8089"}}}'
+          resources:
+            requests:
+              cpu: 50m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 5
+            failureThreshold: 36
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 20
+            failureThreshold: 3
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: eia-assumed-claims-domain
+  namespace: eia-local
+  labels:
+    app.kubernetes.io/name: eia-assumed-claims-domain
+    app.kubernetes.io/component: vertical-domain
+    app.kubernetes.io/part-of: eia-open-insurance
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: eia-assumed-claims-domain
+  ports:
+    - name: http
+      port: 8090
+      targetPort: http
+      protocol: TCP

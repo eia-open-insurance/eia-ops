@@ -1,0 +1,199 @@
+{{- $dbSecret := include "eia.dbSecretName" . -}}
+{{- range $vertical, $tiers := .Values.verticals }}
+{{- $expert := $tiers.expert }}
+{{- $domain := $tiers.domain }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eia-{{ $vertical }}-expert
+  namespace: {{ $.Values.namespace }}
+  labels:
+    app.kubernetes.io/name: eia-{{ $vertical }}-expert
+    app.kubernetes.io/component: vertical-expert
+    {{- include "eia.labels" $ | nindent 4 }}
+spec:
+  replicas: {{ $.Values.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: eia-{{ $vertical }}-expert
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: eia-{{ $vertical }}-expert
+        app.kubernetes.io/component: vertical-expert
+        app.kubernetes.io/part-of: eia-open-insurance
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: {{ $vertical }}-expert
+          image: {{ include "eia.image" (dict "root" $ "image" $expert.image) }}
+          imagePullPolicy: {{ $.Values.global.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ $expert.port }}
+          env:
+            - name: JAVA_TOOL_OPTIONS
+              value: {{ $.Values.global.javaToolOptions | quote }}
+            - name: SPRING_DATASOURCE_URL
+              value: {{ printf "jdbc:postgresql://eia-postgres:%d/%s" (int $.Values.postgres.servicePort) $expert.database | quote }}
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $dbSecret }}
+                  key: POSTGRES_USER
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $dbSecret }}
+                  key: POSTGRES_PASSWORD
+            - name: SPRING_SQL_INIT_MODE
+              value: "always"
+          resources:
+{{ toYaml $.Values.resources | indent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 5
+            failureThreshold: 36
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 20
+            failureThreshold: 3
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: eia-{{ $vertical }}-expert
+  namespace: {{ $.Values.namespace }}
+  labels:
+    app.kubernetes.io/name: eia-{{ $vertical }}-expert
+    app.kubernetes.io/component: vertical-expert
+    {{- include "eia.labels" $ | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: eia-{{ $vertical }}-expert
+  ports:
+    - name: http
+      port: {{ $expert.port }}
+      targetPort: http
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eia-{{ $vertical }}-domain
+  namespace: {{ $.Values.namespace }}
+  labels:
+    app.kubernetes.io/name: eia-{{ $vertical }}-domain
+    app.kubernetes.io/component: vertical-domain
+    {{- include "eia.labels" $ | nindent 4 }}
+spec:
+  replicas: {{ $.Values.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: eia-{{ $vertical }}-domain
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: eia-{{ $vertical }}-domain
+        app.kubernetes.io/component: vertical-domain
+        app.kubernetes.io/part-of: eia-open-insurance
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: {{ $vertical }}-domain
+          image: {{ include "eia.image" (dict "root" $ "image" $domain.image) }}
+          imagePullPolicy: {{ $.Values.global.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ $domain.port }}
+          env:
+            - name: JAVA_TOOL_OPTIONS
+              value: {{ $.Values.global.javaToolOptions | quote }}
+            - name: SPRING_APPLICATION_JSON
+              value: {{ printf "{\"eia\":{\"%s\":{\"expert-url\":\"http://eia-%s-expert:%d\"}}}" $vertical $vertical (int $expert.port) | quote }}
+          resources:
+{{ toYaml $.Values.resources | indent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 5
+            failureThreshold: 36
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 20
+            failureThreshold: 3
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: eia-{{ $vertical }}-domain
+  namespace: {{ $.Values.namespace }}
+  labels:
+    app.kubernetes.io/name: eia-{{ $vertical }}-domain
+    app.kubernetes.io/component: vertical-domain
+    {{- include "eia.labels" $ | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: eia-{{ $vertical }}-domain
+  ports:
+    - name: http
+      port: {{ $domain.port }}
+      targetPort: http
+      protocol: TCP
+{{- end }}

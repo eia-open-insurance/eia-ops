@@ -1,0 +1,203 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eia-payment-expert
+  namespace: eia-local
+  labels:
+    app.kubernetes.io/name: eia-payment-expert
+    app.kubernetes.io/component: vertical-expert
+    app.kubernetes.io/part-of: eia-open-insurance
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: eia-payment-expert
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: eia-payment-expert
+        app.kubernetes.io/component: vertical-expert
+        app.kubernetes.io/part-of: eia-open-insurance
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: payment-expert
+          image: eia/payment-expert:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8097
+          env:
+            - name: JAVA_TOOL_OPTIONS
+              value: "-Xms32m -Xmx256m -XX:+UseSerialGC"
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://eia-postgres:5432/eia_payment"
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: eia-db
+                  key: POSTGRES_USER
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: eia-db
+                  key: POSTGRES_PASSWORD
+            - name: SPRING_SQL_INIT_MODE
+              value: "always"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 5
+            failureThreshold: 36
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 20
+            failureThreshold: 3
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: eia-payment-expert
+  namespace: eia-local
+  labels:
+    app.kubernetes.io/name: eia-payment-expert
+    app.kubernetes.io/component: vertical-expert
+    app.kubernetes.io/part-of: eia-open-insurance
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: eia-payment-expert
+  ports:
+    - name: http
+      port: 8097
+      targetPort: http
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eia-payment-domain
+  namespace: eia-local
+  labels:
+    app.kubernetes.io/name: eia-payment-domain
+    app.kubernetes.io/component: vertical-domain
+    app.kubernetes.io/part-of: eia-open-insurance
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: eia-payment-domain
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: eia-payment-domain
+        app.kubernetes.io/component: vertical-domain
+        app.kubernetes.io/part-of: eia-open-insurance
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: payment-domain
+          image: eia/payment-domain:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8098
+          env:
+            - name: JAVA_TOOL_OPTIONS
+              value: "-Xms32m -Xmx256m -XX:+UseSerialGC"
+            - name: SPRING_APPLICATION_JSON
+              value: '{"eia":{"payment":{"expert-url":"http://eia-payment-expert:8097"}}}'
+          resources:
+            requests:
+              cpu: 50m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 5
+            failureThreshold: 36
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 20
+            failureThreshold: 3
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: eia-payment-domain
+  namespace: eia-local
+  labels:
+    app.kubernetes.io/name: eia-payment-domain
+    app.kubernetes.io/component: vertical-domain
+    app.kubernetes.io/part-of: eia-open-insurance
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: eia-payment-domain
+  ports:
+    - name: http
+      port: 8098
+      targetPort: http
+      protocol: TCP

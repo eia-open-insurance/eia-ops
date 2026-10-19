@@ -1,0 +1,137 @@
+{{- $dbSecret := include "eia.dbSecretName" . -}}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: eia-postgres-data
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: eia-postgres
+    app.kubernetes.io/component: database
+    {{- include "eia.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+{{- if .Values.postgres.persistence.storageClassName }}
+  storageClassName: {{ .Values.postgres.persistence.storageClassName | quote }}
+{{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.postgres.persistence.size }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eia-postgres
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: eia-postgres
+    app.kubernetes.io/component: database
+    {{- include "eia.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: eia-postgres
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: eia-postgres
+        app.kubernetes.io/component: database
+        app.kubernetes.io/part-of: eia-open-insurance
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 70
+        runAsGroup: 70
+        fsGroup: 70
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: postgres
+          image: {{ printf "%s:%s" .Values.postgres.image.repository .Values.postgres.image.tag | quote }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: postgres
+              containerPort: {{ .Values.postgres.servicePort }}
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $dbSecret }}
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $dbSecret }}
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_DB
+              value: {{ .Values.postgres.auth.database | quote }}
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          resources:
+{{ toYaml .Values.postgres.resources | indent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          startupProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pg_isready -U "$POSTGRES_USER" -d postgres
+            periodSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pg_isready -U "$POSTGRES_USER" -d postgres
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pg_isready -U "$POSTGRES_USER" -d postgres
+            periodSeconds: 20
+            failureThreshold: 3
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+            - name: initdb
+              mountPath: /docker-entrypoint-initdb.d
+              readOnly: true
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: eia-postgres-data
+        - name: initdb
+          configMap:
+            name: eia-postgres-initdb
+            defaultMode: 0755
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: eia-postgres
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: eia-postgres
+    app.kubernetes.io/component: database
+    {{- include "eia.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: eia-postgres
+  ports:
+    - name: postgres
+      port: {{ .Values.postgres.servicePort }}
+      targetPort: postgres
+      protocol: TCP

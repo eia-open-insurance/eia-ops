@@ -1,0 +1,203 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eia-cession-expert
+  namespace: eia-local
+  labels:
+    app.kubernetes.io/name: eia-cession-expert
+    app.kubernetes.io/component: vertical-expert
+    app.kubernetes.io/part-of: eia-open-insurance
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: eia-cession-expert
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: eia-cession-expert
+        app.kubernetes.io/component: vertical-expert
+        app.kubernetes.io/part-of: eia-open-insurance
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: cession-expert
+          image: eia/cession-expert:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8091
+          env:
+            - name: JAVA_TOOL_OPTIONS
+              value: "-Xms32m -Xmx256m -XX:+UseSerialGC"
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://eia-postgres:5432/eia_cession"
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: eia-db
+                  key: POSTGRES_USER
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: eia-db
+                  key: POSTGRES_PASSWORD
+            - name: SPRING_SQL_INIT_MODE
+              value: "always"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 5
+            failureThreshold: 36
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 20
+            failureThreshold: 3
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: eia-cession-expert
+  namespace: eia-local
+  labels:
+    app.kubernetes.io/name: eia-cession-expert
+    app.kubernetes.io/component: vertical-expert
+    app.kubernetes.io/part-of: eia-open-insurance
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: eia-cession-expert
+  ports:
+    - name: http
+      port: 8091
+      targetPort: http
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eia-cession-domain
+  namespace: eia-local
+  labels:
+    app.kubernetes.io/name: eia-cession-domain
+    app.kubernetes.io/component: vertical-domain
+    app.kubernetes.io/part-of: eia-open-insurance
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: eia-cession-domain
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: eia-cession-domain
+        app.kubernetes.io/component: vertical-domain
+        app.kubernetes.io/part-of: eia-open-insurance
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: cession-domain
+          image: eia/cession-domain:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8092
+          env:
+            - name: JAVA_TOOL_OPTIONS
+              value: "-Xms32m -Xmx256m -XX:+UseSerialGC"
+            - name: SPRING_APPLICATION_JSON
+              value: '{"eia":{"cession":{"expert-url":"http://eia-cession-expert:8091"}}}'
+          resources:
+            requests:
+              cpu: 50m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 5
+            failureThreshold: 36
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 20
+            failureThreshold: 3
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: eia-cession-domain
+  namespace: eia-local
+  labels:
+    app.kubernetes.io/name: eia-cession-domain
+    app.kubernetes.io/component: vertical-domain
+    app.kubernetes.io/part-of: eia-open-insurance
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: eia-cession-domain
+  ports:
+    - name: http
+      port: 8092
+      targetPort: http
+      protocol: TCP

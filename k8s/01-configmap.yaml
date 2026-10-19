@@ -1,0 +1,146 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: eia-gateway-config
+  namespace: eia-local
+  labels:
+    app.kubernetes.io/name: eia-gateway
+    app.kubernetes.io/component: platform
+    app.kubernetes.io/part-of: eia-open-insurance
+data:
+  application.yml: |-
+    # Environment-owned Spring Cloud Gateway configuration.
+    # The gateway artefact ships a localhost-based application.yml (repos/eia-platform/gateway);
+    # this overlay replaces the route targets with the service names used by Compose and Kubernetes.
+    # Mounted at /app/config/application.yml; Spring Boot loads it ahead of the classpath copy.
+    server:
+      port: 8080
+    spring:
+      application:
+        name: eia-gateway
+      cloud:
+        gateway:
+          globalcors:
+            cors-configurations:
+              '[/**]':
+                allowedOrigins:
+                  - http://localhost:3000
+                  - http://127.0.0.1:3000
+                  - http://eia.local
+                allowedMethods:
+                  - GET
+                  - POST
+                  - PUT
+                  - PATCH
+                  - DELETE
+                  - OPTIONS
+                allowedHeaders:
+                  - '*'
+                allowCredentials: true
+          routes:
+            - id: party
+              uri: http://eia-party-domain:8082
+              predicates:
+                - Path=/api/v1/parties/**
+            - id: policy
+              uri: http://eia-policy-domain:8084
+              predicates:
+                - Path=/api/v1/policies/**
+            - id: contract
+              uri: http://eia-contract-domain:8086
+              predicates:
+                - Path=/api/v1/contracts/**
+            - id: direct-claims
+              uri: http://eia-direct-claims-domain:8088
+              predicates:
+                - Path=/api/v1/claims/**
+            - id: assumed-claims
+              uri: http://eia-assumed-claims-domain:8090
+              predicates:
+                - Path=/api/v1/assumed-claims/**
+            - id: cession
+              uri: http://eia-cession-domain:8092
+              predicates:
+                - Path=/api/v1/cessions/**
+            - id: retrocession
+              uri: http://eia-retrocession-domain:8094
+              predicates:
+                - Path=/api/v1/retrocessions/**
+            - id: document
+              uri: http://eia-document-domain:8096
+              predicates:
+                - Path=/api/v1/documents/**
+            - id: payment
+              uri: http://eia-payment-domain:8098
+              predicates:
+                - Path=/api/v1/payments/**
+            - id: notifications
+              uri: http://eia-notifications-domain:8100
+              predicates:
+                - Path=/api/v1/notifications/**
+            - id: lineage
+              uri: http://eia-lineage:8101
+              predicates:
+                - Path=/api/v1/lineage/**
+    management:
+      endpoints:
+        web:
+          exposure:
+            include: health,info,gateway
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: eia-config-server-config
+  namespace: eia-local
+  labels:
+    app.kubernetes.io/name: eia-config
+    app.kubernetes.io/component: platform
+    app.kubernetes.io/part-of: eia-open-insurance
+data:
+  application.yml: |-
+    # Local placeholder served by the native Spring Cloud Config Server.
+    # The column is intentionally empty: no hosted config repository is used in local deployment.
+    eia:
+      config:
+        source: local-placeholder
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: eia-shell-config
+  namespace: eia-local
+  labels:
+    app.kubernetes.io/name: eia-shell
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/part-of: eia-open-insurance
+data:
+  default.conf: |-
+    # Shell reverse proxy for the local container and Kubernetes deployments.
+    # /api is forwarded to the gateway; unknown paths fall back to the SPA entry point.
+    server {
+        listen 80;
+        server_name _;
+
+        root /usr/share/nginx/html;
+        index index.html;
+
+        location = /healthz {
+            access_log off;
+            add_header Content-Type text/plain;
+            return 200 "ok\n";
+        }
+
+        location /api/ {
+            proxy_pass http://eia-gateway:8080;
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        location / {
+            try_files $uri $uri/ /index.html;
+        }
+    }

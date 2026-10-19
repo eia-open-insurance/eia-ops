@@ -1,0 +1,36 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: eia
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: eia
+    {{- include "eia.labels" . | nindent 4 }}
+{{- with .Values.ingress.annotations }}
+  annotations:
+{{ toYaml . | indent 4 }}
+{{- end }}
+spec:
+{{- with .Values.ingress.className }}
+  ingressClassName: {{ . }}
+{{- end }}
+  rules:
+    - host: {{ .Values.ingress.host }}
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: eia-gateway
+                port:
+                  number: {{ (.Values.platform.gateway).port }}
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: eia-shell
+                port:
+                  number: {{ .Values.shell.port }}
+{{- end }}

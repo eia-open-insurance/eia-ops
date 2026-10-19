@@ -1,0 +1,12 @@
+apiVersion: v2
+name: eia
+description: Local single-cluster deployment of the EIA Open Insurance platform and its implemented vertical services.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+kubeVersion: ">=1.27.0-0"
+keywords:
+  - insurance
+  - policy
+  - claims
+  - reinsurance
