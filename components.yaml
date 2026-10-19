@@ -1,0 +1,21 @@
+components:
+  - name: infra
+    path: infra
+    type: infrastructure
+    deployable: false
+  - name: environments
+    path: environments
+    type: environment
+    deployable: false
+  - name: observability
+    path: observability
+    type: observability
+    deployable: false
+  - name: release
+    path: release
+    type: release
+    deployable: false
+  - name: security
+    path: security
+    type: security
+    deployable: false
