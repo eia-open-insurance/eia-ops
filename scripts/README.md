@@ -5,7 +5,7 @@ their own location; they can be run from any directory.
 
 | Script | Purpose |
 |---|---|
-| `build-images.ps1` | Run Gradle `bootJar` per component and build the `eia/*:local` images |
+| `build-images.ps1` | Run Gradle `bootJar` per component and build the `eia/*:local` images (Java services, shell, ten web remotes, FS-RI simulator) |
 | `compose-up.ps1` | Parse-check and start the Compose stack |
 | `compose-down.ps1` | Stop the stack; `-Volumes` also deletes PostgreSQL data |
 | `deploy-kind.ps1` | Create/reuse a kind cluster, load images, apply `k8s/` |

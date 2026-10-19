@@ -139,6 +139,7 @@ verticals:
         repository: eia/cession-domain
         tag: local
       port: 8092
+      fsriBaseUrl: http://eia-fsri-simulator:8181
   retrocession:
     expert:
       image:
@@ -151,6 +152,7 @@ verticals:
         repository: eia/retrocession-domain
         tag: local
       port: 8094
+      fsriBaseUrl: http://eia-fsri-simulator:8181
   document:
     expert:
       image:
@@ -201,9 +203,73 @@ shell:
       cpu: 200m
       memory: 128Mi
 
+# Federated web remotes (Module Federation). Each image serves its dist bundle on
+# port 80; the Ingress rewrites /remotes/<vertical>/ to the remote root.
+web:
+  party:
+    image:
+      repository: eia/party-web
+      tag: local
+    port: 80
+  policy:
+    image:
+      repository: eia/policy-web
+      tag: local
+    port: 80
+  contract:
+    image:
+      repository: eia/contract-web
+      tag: local
+    port: 80
+  direct-claims:
+    image:
+      repository: eia/direct-claims-web
+      tag: local
+    port: 80
+  assumed-claims:
+    image:
+      repository: eia/assumed-claims-web
+      tag: local
+    port: 80
+  cession:
+    image:
+      repository: eia/cession-web
+      tag: local
+    port: 80
+  retrocession:
+    image:
+      repository: eia/retrocession-web
+      tag: local
+    port: 80
+  document:
+    image:
+      repository: eia/document-web
+      tag: local
+    port: 80
+  payment:
+    image:
+      repository: eia/payment-web
+      tag: local
+    port: 80
+  notifications:
+    image:
+      repository: eia/notifications-web
+      tag: local
+    port: 80
+
+# External-system test doubles (SPEC 15.3). Only FS-RI is needed by the implemented
+# cession and retrocession verticals.
+simulators:
+  fsri:
+    image:
+      repository: eia/fsri-simulator
+      tag: local
+    port: 8181
+
 ingress:
   enabled: true
   className: nginx
   host: eia.local
+  remotesPrefix: /remotes
   annotations:
     nginx.ingress.kubernetes.io/proxy-body-size: 16m

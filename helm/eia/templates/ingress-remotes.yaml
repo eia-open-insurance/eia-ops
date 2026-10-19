@@ -1,0 +1,35 @@
+{{- if .Values.ingress.enabled }}
+# Federated web remotes: the ingress-nginx regular-expression rewrite strips the
+# /remotes/<vertical> prefix. Module Federation derives its chunk public path from
+# the remoteEntry.js script URL, so the browser keeps /remotes/<vertical>/ while
+# nginx serves every file from the remote root.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: eia-remotes
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: eia-remotes
+    {{- include "eia.labels" . | nindent 4 }}
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: 16m
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+spec:
+{{- with .Values.ingress.className }}
+  ingressClassName: {{ . }}
+{{- end }}
+  rules:
+    - host: {{ .Values.ingress.host }}
+      http:
+        paths:
+{{- range $vertical, $web := .Values.web }}
+          - path: {{ $.Values.ingress.remotesPrefix }}/{{ $vertical }}(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: eia-{{ $vertical }}-web
+                port:
+                  number: {{ $web.port }}
+{{- end }}
+{{- end }}

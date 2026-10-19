@@ -14,7 +14,9 @@ Dockerfiles used by the local build scripts, because the owning files cannot be 
 
 The eight remaining Java Dockerfiles (`policy`, `cession`, `notifications`, `payment`)
 already copy the correct Gradle boot jar and expose the correct port, so they are used
-unchanged. The shell image also uses its repository Dockerfile.
+unchanged. The shell image also uses its repository Dockerfile. The ten web remotes and the
+FS-RI simulator likewise use deployment-owned Dockerfiles from this directory (see the two
+sections below).
 
 ## Build contexts
 
@@ -48,8 +50,45 @@ The context must be the component directory, because each Dockerfile copies `bui
 | `eia/notifications-expert:local` | `repos/eia-notifications-expert` | `repos/eia-notifications-expert/Dockerfile` | 8099 |
 | `eia/notifications-domain:local` | `repos/eia-notifications-domain` | `repos/eia-notifications-domain/Dockerfile` | 8100 |
 | `eia/shell:local` | `repos/eia-frontend/shell` | `repos/eia-frontend/shell/Dockerfile` | 80 |
+| `eia/<vertical>-web:local` | `repos/eia-<vertical>-web` | `repos/eia-ops/images/web/remote.Dockerfile` | 80 |
+| `eia/fsri-simulator:local` | `repos/eia-quality` | `repos/eia-ops/images/simulators/fsri.Dockerfile` | 8181 |
 
 PostgreSQL uses the upstream `postgres:17-alpine` image.
+
+## Web remote images
+
+The ten federated remotes share one deployment-owned Dockerfile,
+`web/remote.Dockerfile`. It copies the owning repository's `dist/` bundle into
+`nginx:1.27-alpine` and writes an nginx config that:
+
+- serves the bundle at `/` with `try_files $uri $uri/ /index.html` (SPA fallback);
+- exposes `/healthz` for Kubernetes probes;
+- marks `remoteEntry.js` `no-store` and content chunks immutable.
+
+The build context is the web repository (not this directory), so the bundle must be built
+first:
+
+```powershell
+Set-Location repos/eia-party-web
+npm ci
+npm run build
+Set-Location ../..
+docker build -f repos/eia-ops/images/web/remote.Dockerfile -t eia/party-web:local repos/eia-party-web
+```
+
+Neither the Ingress rewrite (`/remotes/<vertical>(/|$)(.*)` → `/$2`) nor the shell nginx
+proxy (`/remotes/<vertical>/` → `http://eia-<vertical>-web:80/`) changes the bundle: Webpack's
+automatic public path derives the chunk base from the executed `remoteEntry.js` URL, so the
+same image works behind the Ingress, behind the shell port-forward, and in Compose.
+
+## FS-RI simulator image
+
+`simulators/fsri.Dockerfile` packages the eia-quality FS-RI test double (SPEC 15.3). The
+build context is `repos/eia-quality` because the simulator imports
+`simulators/common/*.mjs`; no npm install is needed (Node built-ins only). The owning
+Dockerfile exposes 8080, while this image keeps the simulator's native port **8181** so that
+the Service, `EIA_FSRI_BASE_URL=http://eia-fsri-simulator:8181`, and the local
+`run-local.ps1` workflow all agree.
 
 ## Manual build example
 

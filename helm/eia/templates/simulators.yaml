@@ -1,0 +1,99 @@
+{{- with .Values.simulators.fsri }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eia-fsri-simulator
+  namespace: {{ $.Values.namespace }}
+  labels:
+    app.kubernetes.io/name: eia-fsri-simulator
+    app.kubernetes.io/component: simulator
+    {{- include "eia.labels" $ | nindent 4 }}
+spec:
+  replicas: {{ $.Values.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: eia-fsri-simulator
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: eia-fsri-simulator
+        app.kubernetes.io/component: simulator
+        app.kubernetes.io/part-of: eia-open-insurance
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: fsri-simulator
+          image: {{ include "eia.image" (dict "root" $ "image" .image) }}
+          imagePullPolicy: {{ $.Values.global.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .port }}
+          env:
+            - name: HOST
+              value: "0.0.0.0"
+            - name: PORT
+              value: {{ .port | quote }}
+            - name: SIM_ENV
+              value: "test"
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          startupProbe:
+            httpGet:
+              path: /sim/fsri/health
+              port: http
+            periodSeconds: 2
+            failureThreshold: 15
+          readinessProbe:
+            httpGet:
+              path: /sim/fsri/health
+              port: http
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /sim/fsri/health
+              port: http
+            periodSeconds: 20
+            failureThreshold: 3
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: eia-fsri-simulator
+  namespace: {{ $.Values.namespace }}
+  labels:
+    app.kubernetes.io/name: eia-fsri-simulator
+    app.kubernetes.io/component: simulator
+    {{- include "eia.labels" $ | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: eia-fsri-simulator
+  ports:
+    - name: http
+      port: {{ .port }}
+      targetPort: http
+      protocol: TCP
+{{- end }}

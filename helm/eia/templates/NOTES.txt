@@ -11,7 +11,11 @@ Images:
   {{ include "eia.image" (dict "root" $ "image" $tiers.expert.image) }}
   {{ include "eia.image" (dict "root" $ "image" $tiers.domain.image) }}
 {{- end }}
+{{- range $vertical, $web := .Values.web }}
+  {{ include "eia.image" (dict "root" $ "image" $web.image) }}
+{{- end }}
   {{ include "eia.image" (dict "root" . "image" .Values.shell.image) }}
+  {{ include "eia.image" (dict "root" . "image" .Values.simulators.fsri.image) }}
   {{ printf "%s:%s" .Values.postgres.image.repository .Values.postgres.image.tag }}
 
 Check rollout:
@@ -26,6 +30,9 @@ The Ingress expects host "{{ .Values.ingress.host }}". Point it at the ingress c
 Without an ingress controller, port-forward the entry points:
   kubectl -n {{ .Values.namespace }} port-forward svc/eia-shell 3000:{{ .Values.shell.port }}
   kubectl -n {{ .Values.namespace }} port-forward svc/eia-gateway 8080:{{ (.Values.platform.gateway).port }}
+The shell nginx proxies {{ .Values.ingress.remotesPrefix }}/<vertical>/ to the web Services, so the
+shell forward also serves the federated UI. Optional FS-RI simulator forward:
+  kubectl -n {{ .Values.namespace }} port-forward svc/eia-fsri-simulator 8181:{{ .Values.simulators.fsri.port }}
 {{- end }}
 
 Health endpoints use Spring Boot Actuator at /actuator/health on each service port.

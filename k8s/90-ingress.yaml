@@ -28,3 +28,96 @@ spec:
                 name: eia-shell
                 port:
                   number: 80
+---
+# Federated web remotes. The ingress-nginx regular-expression rewrite strips the
+# /remotes/<vertical> prefix, so remoteEntry.js and its Webpack chunks are served
+# from each remote's nginx root while the browser keeps the /remotes/<vertical>/
+# public path that Module Federation derives from the script URL.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: eia-remotes
+  namespace: eia-local
+  labels:
+    app.kubernetes.io/name: eia-remotes
+    app.kubernetes.io/part-of: eia-open-insurance
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: 16m
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: eia.local
+      http:
+        paths:
+          - path: /remotes/party(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: eia-party-web
+                port:
+                  number: 80
+          - path: /remotes/policy(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: eia-policy-web
+                port:
+                  number: 80
+          - path: /remotes/contract(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: eia-contract-web
+                port:
+                  number: 80
+          - path: /remotes/direct-claims(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: eia-direct-claims-web
+                port:
+                  number: 80
+          - path: /remotes/assumed-claims(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: eia-assumed-claims-web
+                port:
+                  number: 80
+          - path: /remotes/cession(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: eia-cession-web
+                port:
+                  number: 80
+          - path: /remotes/retrocession(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: eia-retrocession-web
+                port:
+                  number: 80
+          - path: /remotes/document(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: eia-document-web
+                port:
+                  number: 80
+          - path: /remotes/payment(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: eia-payment-web
+                port:
+                  number: 80
+          - path: /remotes/notifications(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: eia-notifications-web
+                port:
+                  number: 80

@@ -145,6 +145,8 @@ spec:
               value: "-Xms32m -Xmx256m -XX:+UseSerialGC"
             - name: SPRING_APPLICATION_JSON
               value: '{"eia":{"retrocession":{"expert-url":"http://eia-retrocession-expert:8093"}}}'
+            - name: EIA_FSRI_BASE_URL
+              value: "http://eia-fsri-simulator:8181"
           resources:
             requests:
               cpu: 50m

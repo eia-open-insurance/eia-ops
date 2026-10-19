@@ -7,7 +7,9 @@ Runs the owning repository's Gradle bootJar task (the wrapper is committed in ev
 repository), then builds an image with either the deployment-owned Dockerfile in
 repos/eia-ops/images or the repository Dockerfile when it is already correct.
 The shell image is built from repos/eia-frontend/shell; rebuild its bundle with
--BuildFrontend after a source change.
+-BuildFrontend after a source change. The ten federated web remotes are packaged from each
+repos/eia-<vertical>-web dist/ directory by images/web/remote.Dockerfile, and the FS-RI
+simulator test double is packaged from repos/eia-quality by images/simulators/fsri.Dockerfile.
 
 .PARAMETER Tag
 Image tag applied to every eia/* image. Default: local.
@@ -22,10 +24,17 @@ Reuse the jars already present under build/libs.
 Do not build or package the Java services.
 
 .PARAMETER BuildFrontend
-Run npm ci/npm run build in eia-frontend/shell even when dist/ exists.
+Run npm ci/npm run build in eia-frontend/shell and in every eia-<vertical>-web repository
+even when their dist/ directories already exist.
 
 .PARAMETER SkipShell
 Do not build the shell image.
+
+.PARAMETER SkipWeb
+Do not build the ten federated web-remote images.
+
+.PARAMETER SkipSimulators
+Do not build the FS-RI simulator image.
 
 .EXAMPLE
 pwsh ./scripts/build-images.ps1 -Tag local
@@ -37,7 +46,9 @@ param(
     [switch]$SkipGradle,
     [switch]$SkipJava,
     [switch]$BuildFrontend,
-    [switch]$SkipShell
+    [switch]$SkipShell,
+    [switch]$SkipWeb,
+    [switch]$SkipSimulators
 )
 
 . "$PSScriptRoot\_common.ps1"
@@ -159,6 +170,68 @@ if (-not $SkipShell) {
         throw "docker build failed for $image (exit $LASTEXITCODE)"
     }
     $built.Add($image)
+}
+
+if (-not $SkipWeb) {
+    $npm = Find-ToolPath -Name 'npm' -Candidates @('C:\Program Files\nodejs\npm.cmd')
+    if (-not $npm) {
+        throw 'npm was not found and a web-remote dist bundle is missing; install Node 24 / npm 11.'
+    }
+    foreach ($remote in Get-EiaWebRemotes) {
+        $context = Join-Path $reposRoot $remote.Repo
+        if (-not (Test-Path -LiteralPath (Join-Path $context 'package.json'))) {
+            throw "Missing web component directory: $context"
+        }
+        $distIndex = Join-Path $context 'dist\index.html'
+        if ($BuildFrontend -or -not (Test-Path -LiteralPath $distIndex)) {
+            Push-Location $context
+            try {
+                if (-not (Test-Path -LiteralPath (Join-Path $context 'node_modules'))) {
+                    Write-Host "==> npm ci ($($remote.Repo))"
+                    & $npm ci
+                    if ($LASTEXITCODE -ne 0) {
+                        throw "npm ci failed for $($remote.Repo) with exit code $LASTEXITCODE"
+                    }
+                }
+                Write-Host "==> npm run build ($($remote.Repo))"
+                & $npm run build
+                if ($LASTEXITCODE -ne 0) {
+                    throw "npm run build failed for $($remote.Repo) with exit code $LASTEXITCODE"
+                }
+            }
+            finally {
+                Pop-Location
+            }
+        }
+        else {
+            Write-Host "==> using existing $($remote.Repo)/dist (pass -BuildFrontend to rebuild)"
+        }
+
+        $image = "eia/$($remote.Name)-web:$Tag"
+        Write-Host "==> docker build $image"
+        & $docker build -f (Join-Path $opsRoot 'images\web\remote.Dockerfile') -t $image $context
+        if ($LASTEXITCODE -ne 0) {
+            throw "docker build failed for $image (exit $LASTEXITCODE)"
+        }
+        $built.Add($image)
+    }
+}
+
+if (-not $SkipSimulators) {
+    foreach ($simulator in Get-EiaSimulators) {
+        $context = Join-Path $reposRoot $simulator.Repo
+        $dockerfile = Join-Path $opsRoot $simulator.Dockerfile
+        if (-not (Test-Path -LiteralPath $dockerfile)) {
+            throw "Missing Dockerfile: $dockerfile"
+        }
+        $image = "eia/$($simulator.Name):$Tag"
+        Write-Host "==> docker build $image"
+        & $docker build -f $dockerfile -t $image $context
+        if ($LASTEXITCODE -ne 0) {
+            throw "docker build failed for $image (exit $LASTEXITCODE)"
+        }
+        $built.Add($image)
+    }
 }
 
 Write-Host ''

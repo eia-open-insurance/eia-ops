@@ -7,6 +7,8 @@ resources:
   - 10-postgres.yaml
   - 20-platform.yaml
   - 30-shell.yaml
+  - 31-web.yaml
+  - 36-fsri-simulator.yaml
   - 90-ingress.yaml
   - verticals/party.yaml
   - verticals/policy.yaml

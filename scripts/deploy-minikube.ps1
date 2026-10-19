@@ -109,5 +109,8 @@ Write-Host ''
 Write-Host 'Port-forward fallback:'
 Write-Host '  kubectl -n eia-local port-forward svc/eia-shell 3000:80'
 Write-Host '  kubectl -n eia-local port-forward svc/eia-gateway 8080:8080'
+Write-Host 'The shell nginx proxies /remotes/<vertical>/ to the ten web Services, so the shell'
+Write-Host 'forward is enough for the federated UI. Optional direct FS-RI simulator check:'
+Write-Host '  kubectl -n eia-local port-forward svc/eia-fsri-simulator 8181:8181'
 Write-Host ''
 Write-Host "Stop with: minikube stop --profile $Profile; delete with: minikube delete --profile $Profile"

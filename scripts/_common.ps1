@@ -134,10 +134,40 @@ function Get-EiaJavaServices {
     return $script:JavaServices
 }
 
+# Federated web remotes. The container port is always 80; HostPort is the local
+# webpack-dev-server port used by `npm start` and by run-local.ps1.
+$script:WebRemotes = @(
+    [pscustomobject]@{ Name = 'party'; Repo = 'eia-party-web'; HostPort = 3001; Port = 80 }
+    [pscustomobject]@{ Name = 'policy'; Repo = 'eia-policy-web'; HostPort = 3002; Port = 80 }
+    [pscustomobject]@{ Name = 'contract'; Repo = 'eia-contract-web'; HostPort = 3003; Port = 80 }
+    [pscustomobject]@{ Name = 'direct-claims'; Repo = 'eia-direct-claims-web'; HostPort = 3004; Port = 80 }
+    [pscustomobject]@{ Name = 'assumed-claims'; Repo = 'eia-assumed-claims-web'; HostPort = 3005; Port = 80 }
+    [pscustomobject]@{ Name = 'cession'; Repo = 'eia-cession-web'; HostPort = 3006; Port = 80 }
+    [pscustomobject]@{ Name = 'retrocession'; Repo = 'eia-retrocession-web'; HostPort = 3007; Port = 80 }
+    [pscustomobject]@{ Name = 'document'; Repo = 'eia-document-web'; HostPort = 3008; Port = 80 }
+    [pscustomobject]@{ Name = 'payment'; Repo = 'eia-payment-web'; HostPort = 3009; Port = 80 }
+    [pscustomobject]@{ Name = 'notifications'; Repo = 'eia-notifications-web'; HostPort = 3010; Port = 80 }
+)
+
+function Get-EiaWebRemotes {
+    return $script:WebRemotes
+}
+
+# External-system test doubles used by the implemented verticals (SPEC 15.3).
+$script:Simulators = @(
+    [pscustomobject]@{ Name = 'fsri-simulator'; Repo = 'eia-quality'; Dockerfile = 'images/simulators/fsri.Dockerfile'; Port = 8181; HealthPath = '/sim/fsri/health' }
+)
+
+function Get-EiaSimulators {
+    return $script:Simulators
+}
+
 function Get-EiaImages {
     param([string]$Tag = 'local')
 
     $images = @($script:JavaServices | ForEach-Object { "eia/$($_.Name):$Tag" })
     $images += "eia/shell:$Tag"
+    $images += @($script:WebRemotes | ForEach-Object { "eia/$($_.Name)-web:$Tag" })
+    $images += @($script:Simulators | ForEach-Object { "eia/$($_.Name):$Tag" })
     return $images
 }

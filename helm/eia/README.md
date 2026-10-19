@@ -1,7 +1,7 @@
 # eia Helm chart
 
-Single-cluster local deployment of the platform, shell, PostgreSQL, and the 20 implemented
-vertical services.
+Single-cluster local deployment of the platform, shell, PostgreSQL, the 20 implemented
+vertical services, the ten federated web remotes, and the FS-RI simulator test double.
 
 ## Commands
 
@@ -31,14 +31,17 @@ helm upgrade --install eia helm/eia --namespace eia-local `
 
 - `global.imageTag` and per-service `image.tag` / `image.repository` for image tags.
 - `platform.<name>.port`, `verticals.<vertical>.{expert,domain}.port`, `shell.port`,
-  `postgres.servicePort` for service ports.
+  `web.<vertical>.port`, `simulators.fsri.port`, and `postgres.servicePort` for service ports.
+- `verticals.cession.domain.fsriBaseUrl` and `verticals.retrocession.domain.fsriBaseUrl`
+  set `EIA_FSRI_BASE_URL` for the two reinsurance-administration domains.
 - `postgres.auth` for local credentials; the placeholder is created only when
   `existingSecret` is empty.
-- `ingress.*` for the host and annotations.
+- `ingress.*` for the host, annotations, and the `/remotes` prefix used by the
+  second Ingress (`eia-remotes`) whose regex rewrite strips the prefix.
 - `resources`, `replicaCount`, and `global.javaToolOptions` for sizing.
 
-The chart renders the same workload set as `k8s/`: 26 Deployments, 26 Services, 4 ConfigMaps,
-1 Secret, 1 PVC, and 1 Ingress. The Namespace is created by `--create-namespace` and is not a
+The chart renders the same workload set as `k8s/`: 37 Deployments, 37 Services, 4 ConfigMaps,
+1 Secret, 1 PVC, and 2 Ingresses. The Namespace is created by `--create-namespace` and is not a
 chart resource, which avoids Helm ownership conflicts on reinstall.
 
 ## Notes

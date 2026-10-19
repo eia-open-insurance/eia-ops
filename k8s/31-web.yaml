@@ -1,0 +1,724 @@
+# EIA Open Insurance - federated web remotes (one Deployment + Service per vertical).
+# Each image is built by repos/eia-ops/images/web/remote.Dockerfile from the owning
+# repos/eia-<vertical>-web dist/ output and serves the bundle on port 80.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eia-party-web
+  namespace: eia-local
+  labels:
+    app.kubernetes.io/name: eia-party-web
+    app.kubernetes.io/component: web-remote
+    app.kubernetes.io/part-of: eia-open-insurance
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: eia-party-web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: eia-party-web
+        app.kubernetes.io/component: web-remote
+        app.kubernetes.io/part-of: eia-open-insurance
+    spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: party-web
+          image: eia/party-web:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 80
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 20
+            failureThreshold: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: eia-party-web
+  namespace: eia-local
+  labels:
+    app.kubernetes.io/name: eia-party-web
+    app.kubernetes.io/component: web-remote
+    app.kubernetes.io/part-of: eia-open-insurance
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: eia-party-web
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eia-policy-web
+  namespace: eia-local
+  labels:
+    app.kubernetes.io/name: eia-policy-web
+    app.kubernetes.io/component: web-remote
+    app.kubernetes.io/part-of: eia-open-insurance
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: eia-policy-web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: eia-policy-web
+        app.kubernetes.io/component: web-remote
+        app.kubernetes.io/part-of: eia-open-insurance
+    spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: policy-web
+          image: eia/policy-web:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 80
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 20
+            failureThreshold: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: eia-policy-web
+  namespace: eia-local
+  labels:
+    app.kubernetes.io/name: eia-policy-web
+    app.kubernetes.io/component: web-remote
+    app.kubernetes.io/part-of: eia-open-insurance
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: eia-policy-web
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eia-contract-web
+  namespace: eia-local
+  labels:
+    app.kubernetes.io/name: eia-contract-web
+    app.kubernetes.io/component: web-remote
+    app.kubernetes.io/part-of: eia-open-insurance
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: eia-contract-web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: eia-contract-web
+        app.kubernetes.io/component: web-remote
+        app.kubernetes.io/part-of: eia-open-insurance
+    spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: contract-web
+          image: eia/contract-web:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 80
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 20
+            failureThreshold: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: eia-contract-web
+  namespace: eia-local
+  labels:
+    app.kubernetes.io/name: eia-contract-web
+    app.kubernetes.io/component: web-remote
+    app.kubernetes.io/part-of: eia-open-insurance
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: eia-contract-web
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eia-direct-claims-web
+  namespace: eia-local
+  labels:
+    app.kubernetes.io/name: eia-direct-claims-web
+    app.kubernetes.io/component: web-remote
+    app.kubernetes.io/part-of: eia-open-insurance
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: eia-direct-claims-web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: eia-direct-claims-web
+        app.kubernetes.io/component: web-remote
+        app.kubernetes.io/part-of: eia-open-insurance
+    spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: direct-claims-web
+          image: eia/direct-claims-web:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 80
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 20
+            failureThreshold: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: eia-direct-claims-web
+  namespace: eia-local
+  labels:
+    app.kubernetes.io/name: eia-direct-claims-web
+    app.kubernetes.io/component: web-remote
+    app.kubernetes.io/part-of: eia-open-insurance
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: eia-direct-claims-web
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eia-assumed-claims-web
+  namespace: eia-local
+  labels:
+    app.kubernetes.io/name: eia-assumed-claims-web
+    app.kubernetes.io/component: web-remote
+    app.kubernetes.io/part-of: eia-open-insurance
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: eia-assumed-claims-web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: eia-assumed-claims-web
+        app.kubernetes.io/component: web-remote
+        app.kubernetes.io/part-of: eia-open-insurance
+    spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: assumed-claims-web
+          image: eia/assumed-claims-web:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 80
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 20
+            failureThreshold: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: eia-assumed-claims-web
+  namespace: eia-local
+  labels:
+    app.kubernetes.io/name: eia-assumed-claims-web
+    app.kubernetes.io/component: web-remote
+    app.kubernetes.io/part-of: eia-open-insurance
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: eia-assumed-claims-web
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eia-cession-web
+  namespace: eia-local
+  labels:
+    app.kubernetes.io/name: eia-cession-web
+    app.kubernetes.io/component: web-remote
+    app.kubernetes.io/part-of: eia-open-insurance
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: eia-cession-web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: eia-cession-web
+        app.kubernetes.io/component: web-remote
+        app.kubernetes.io/part-of: eia-open-insurance
+    spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: cession-web
+          image: eia/cession-web:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 80
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 20
+            failureThreshold: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: eia-cession-web
+  namespace: eia-local
+  labels:
+    app.kubernetes.io/name: eia-cession-web
+    app.kubernetes.io/component: web-remote
+    app.kubernetes.io/part-of: eia-open-insurance
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: eia-cession-web
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eia-retrocession-web
+  namespace: eia-local
+  labels:
+    app.kubernetes.io/name: eia-retrocession-web
+    app.kubernetes.io/component: web-remote
+    app.kubernetes.io/part-of: eia-open-insurance
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: eia-retrocession-web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: eia-retrocession-web
+        app.kubernetes.io/component: web-remote
+        app.kubernetes.io/part-of: eia-open-insurance
+    spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: retrocession-web
+          image: eia/retrocession-web:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 80
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 20
+            failureThreshold: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: eia-retrocession-web
+  namespace: eia-local
+  labels:
+    app.kubernetes.io/name: eia-retrocession-web
+    app.kubernetes.io/component: web-remote
+    app.kubernetes.io/part-of: eia-open-insurance
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: eia-retrocession-web
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eia-document-web
+  namespace: eia-local
+  labels:
+    app.kubernetes.io/name: eia-document-web
+    app.kubernetes.io/component: web-remote
+    app.kubernetes.io/part-of: eia-open-insurance
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: eia-document-web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: eia-document-web
+        app.kubernetes.io/component: web-remote
+        app.kubernetes.io/part-of: eia-open-insurance
+    spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: document-web
+          image: eia/document-web:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 80
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 20
+            failureThreshold: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: eia-document-web
+  namespace: eia-local
+  labels:
+    app.kubernetes.io/name: eia-document-web
+    app.kubernetes.io/component: web-remote
+    app.kubernetes.io/part-of: eia-open-insurance
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: eia-document-web
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eia-payment-web
+  namespace: eia-local
+  labels:
+    app.kubernetes.io/name: eia-payment-web
+    app.kubernetes.io/component: web-remote
+    app.kubernetes.io/part-of: eia-open-insurance
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: eia-payment-web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: eia-payment-web
+        app.kubernetes.io/component: web-remote
+        app.kubernetes.io/part-of: eia-open-insurance
+    spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: payment-web
+          image: eia/payment-web:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 80
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 20
+            failureThreshold: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: eia-payment-web
+  namespace: eia-local
+  labels:
+    app.kubernetes.io/name: eia-payment-web
+    app.kubernetes.io/component: web-remote
+    app.kubernetes.io/part-of: eia-open-insurance
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: eia-payment-web
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eia-notifications-web
+  namespace: eia-local
+  labels:
+    app.kubernetes.io/name: eia-notifications-web
+    app.kubernetes.io/component: web-remote
+    app.kubernetes.io/part-of: eia-open-insurance
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: eia-notifications-web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: eia-notifications-web
+        app.kubernetes.io/component: web-remote
+        app.kubernetes.io/part-of: eia-open-insurance
+    spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: notifications-web
+          image: eia/notifications-web:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 80
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 20
+            failureThreshold: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: eia-notifications-web
+  namespace: eia-local
+  labels:
+    app.kubernetes.io/name: eia-notifications-web
+    app.kubernetes.io/component: web-remote
+    app.kubernetes.io/part-of: eia-open-insurance
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: eia-notifications-web
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+

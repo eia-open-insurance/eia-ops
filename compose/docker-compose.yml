@@ -1,8 +1,9 @@
 # EIA Open Insurance - local container stack.
 #
-# Scope: PostgreSQL, gateway, auth, config, lineage, shell, and the 20 implemented
-# vertical services (10 domain services + 10 expert services). The 10 web remotes are
-# static front-ends and stay on the npm dev-server workflow; see ../README.md.
+# Scope: PostgreSQL, gateway, auth, config, lineage, shell, the 20 implemented vertical
+# services (10 domain services + 10 expert services), the 10 federated web remotes, and
+# the FS-RI simulator test double (SPEC 15.3). The shell proxies /remotes/<vertical>/
+# to the web remotes, matching the Kubernetes Ingress rewrite.
 #
 # Local-only values. Copy .env.example to .env before changing credentials.
 name: eia-local
@@ -288,8 +289,11 @@ services:
     environment:
       <<: *java-environment
       SPRING_APPLICATION_JSON: '{"eia":{"cession":{"expert-url":"http://eia-cession-expert:8091"}}}'
+      EIA_FSRI_BASE_URL: http://eia-fsri-simulator:8181
     depends_on:
       eia-cession-expert:
+        condition: service_started
+      eia-fsri-simulator:
         condition: service_started
     ports:
       - "8092:8092"
@@ -321,8 +325,11 @@ services:
     environment:
       <<: *java-environment
       SPRING_APPLICATION_JSON: '{"eia":{"retrocession":{"expert-url":"http://eia-retrocession-expert:8093"}}}'
+      EIA_FSRI_BASE_URL: http://eia-fsri-simulator:8181
     depends_on:
       eia-retrocession-expert:
+        condition: service_started
+      eia-fsri-simulator:
         condition: service_started
     ports:
       - "8094:8094"
@@ -438,7 +445,159 @@ services:
     depends_on:
       eia-gateway:
         condition: service_started
+      eia-party-web:
+        condition: service_started
+      eia-policy-web:
+        condition: service_started
+      eia-contract-web:
+        condition: service_started
+      eia-direct-claims-web:
+        condition: service_started
+      eia-assumed-claims-web:
+        condition: service_started
+      eia-cession-web:
+        condition: service_started
+      eia-retrocession-web:
+        condition: service_started
+      eia-document-web:
+        condition: service_started
+      eia-payment-web:
+        condition: service_started
+      eia-notifications-web:
+        condition: service_started
     volumes:
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
     ports:
       - "3000:80"
+
+  eia-fsri-simulator:
+    image: eia/fsri-simulator:${EIA_TAG:-local}
+    build:
+      context: ../../eia-quality
+      dockerfile: ../eia-ops/images/simulators/fsri.Dockerfile
+    restart: unless-stopped
+    mem_limit: 128m
+    networks:
+      - eia
+    ports:
+      - "8181:8181"
+
+  eia-party-web:
+    image: eia/party-web:${EIA_TAG:-local}
+    build:
+      context: ../../eia-party-web
+      dockerfile: ../eia-ops/images/web/remote.Dockerfile
+    restart: unless-stopped
+    mem_limit: 64m
+    networks:
+      - eia
+    ports:
+      - "3001:80"
+
+  eia-policy-web:
+    image: eia/policy-web:${EIA_TAG:-local}
+    build:
+      context: ../../eia-policy-web
+      dockerfile: ../eia-ops/images/web/remote.Dockerfile
+    restart: unless-stopped
+    mem_limit: 64m
+    networks:
+      - eia
+    ports:
+      - "3002:80"
+
+  eia-contract-web:
+    image: eia/contract-web:${EIA_TAG:-local}
+    build:
+      context: ../../eia-contract-web
+      dockerfile: ../eia-ops/images/web/remote.Dockerfile
+    restart: unless-stopped
+    mem_limit: 64m
+    networks:
+      - eia
+    ports:
+      - "3003:80"
+
+  eia-direct-claims-web:
+    image: eia/direct-claims-web:${EIA_TAG:-local}
+    build:
+      context: ../../eia-direct-claims-web
+      dockerfile: ../eia-ops/images/web/remote.Dockerfile
+    restart: unless-stopped
+    mem_limit: 64m
+    networks:
+      - eia
+    ports:
+      - "3004:80"
+
+  eia-assumed-claims-web:
+    image: eia/assumed-claims-web:${EIA_TAG:-local}
+    build:
+      context: ../../eia-assumed-claims-web
+      dockerfile: ../eia-ops/images/web/remote.Dockerfile
+    restart: unless-stopped
+    mem_limit: 64m
+    networks:
+      - eia
+    ports:
+      - "3005:80"
+
+  eia-cession-web:
+    image: eia/cession-web:${EIA_TAG:-local}
+    build:
+      context: ../../eia-cession-web
+      dockerfile: ../eia-ops/images/web/remote.Dockerfile
+    restart: unless-stopped
+    mem_limit: 64m
+    networks:
+      - eia
+    ports:
+      - "3006:80"
+
+  eia-retrocession-web:
+    image: eia/retrocession-web:${EIA_TAG:-local}
+    build:
+      context: ../../eia-retrocession-web
+      dockerfile: ../eia-ops/images/web/remote.Dockerfile
+    restart: unless-stopped
+    mem_limit: 64m
+    networks:
+      - eia
+    ports:
+      - "3007:80"
+
+  eia-document-web:
+    image: eia/document-web:${EIA_TAG:-local}
+    build:
+      context: ../../eia-document-web
+      dockerfile: ../eia-ops/images/web/remote.Dockerfile
+    restart: unless-stopped
+    mem_limit: 64m
+    networks:
+      - eia
+    ports:
+      - "3008:80"
+
+  eia-payment-web:
+    image: eia/payment-web:${EIA_TAG:-local}
+    build:
+      context: ../../eia-payment-web
+      dockerfile: ../eia-ops/images/web/remote.Dockerfile
+    restart: unless-stopped
+    mem_limit: 64m
+    networks:
+      - eia
+    ports:
+      - "3009:80"
+
+  eia-notifications-web:
+    image: eia/notifications-web:${EIA_TAG:-local}
+    build:
+      context: ../../eia-notifications-web
+      dockerfile: ../eia-ops/images/web/remote.Dockerfile
+    restart: unless-stopped
+    mem_limit: 64m
+    networks:
+      - eia
+    ports:
+      - "3010:80"

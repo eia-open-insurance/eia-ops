@@ -145,6 +145,10 @@ spec:
               value: {{ $.Values.global.javaToolOptions | quote }}
             - name: SPRING_APPLICATION_JSON
               value: {{ printf "{\"eia\":{\"%s\":{\"expert-url\":\"http://eia-%s-expert:%d\"}}}" $vertical $vertical (int $expert.port) | quote }}
+{{- if $domain.fsriBaseUrl }}
+            - name: EIA_FSRI_BASE_URL
+              value: {{ $domain.fsriBaseUrl | quote }}
+{{- end }}
           resources:
 {{ toYaml $.Values.resources | indent 12 }}
           securityContext:

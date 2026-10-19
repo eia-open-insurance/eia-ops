@@ -23,48 +23,36 @@ infrastructure, environments, observability, release, and security policy.
 | Release | `release/` | Release scripts and manifests | No |
 | Security | `security/` | Threat models, policy, test evidence | No |
 
-## Current blocker
+## Local stack status
 
-**Docker Desktop / WSL2 requires a Windows reboot on this machine before the Linux engine and
-minikube can run.** The assets in this repository are complete and validated offline, but no
-image build, `docker compose up`, kind cluster, minikube cluster, or Helm install has been
-executed here.
-
-Evidence recorded on 2026-10-19:
+The Docker Desktop Linux engine and the minikube profile `minikube` are running, and the
+in-cluster stack has been deployed from `k8s/`. Recorded 2026-10-19 after adding the web
+remotes and the FS-RI simulator:
 
 | Check | Result |
 |---|---|
-| `wsl --status` | `WSL_E_WSL_OPTIONAL_COMPONENT_REQUIRED`; "The system may need to be restarted so the changes can take effect." |
-| Windows optional features | `Microsoft-Windows-Subsystem-Linux` = Enabled, `VirtualMachinePlatform` = Enabled |
-| Pending reboot | `HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending` = present |
-| `docker info` | HTTP 500 for `//./pipe/dockerDesktopLinuxEngine/v1.56/info` |
-| Docker client | v29.8.2 (Compose v5.6.0), engine unavailable |
-| `minikube status` | v1.39.0 installed; no profile until the engine can start |
+| `docker version` | server 29.9.1 |
+| `minikube profile list` | profile `minikube`, driver docker, v1.37.0, Running |
+| Pods in `eia-local` | 37/37 Running and Ready |
+| Gateway smoke | 10/10 `/api/v1/*` routes HTTP 200 |
+| Federated UI | Playwright `tests/live-all.spec.js` with `EIA_LIVE=1`: 10/10 through `kubectl port-forward svc/eia-shell 3000:80` |
+| FS-RI hand-off | cession `CES-000000001`: OPEN → RULE_APPLIED → `HANDED_OFF`, `fsriStatus=POSTED`, `FSRI-CES-DIRECT-000001` |
+| `scripts/validate.ps1` | PASS, 45 checks |
 
-Remediation, performed by the operator:
-
-1. Restart Windows so the WSL2 optional component activates.
-2. Start Docker Desktop and wait for "Engine running".
-3. Verify the engine and cluster tooling:
-
-```powershell
-docker version
-docker run --rm hello-world
-wsl --status
-minikube status
-```
-
-Until then, `scripts/validate.ps1` is the supported check: it needs no Docker engine, cluster,
-or network access.
+The earlier blocker (the WSL2 optional component required a Windows restart before Docker
+Desktop's Linux engine and minikube could run) is resolved; the remediation was the recorded
+Windows restart followed by a Docker Desktop start.
 
 ## Layout
 
 ```text
 repos/eia-ops/
-  images/            deployment-owned Dockerfiles + build-context table
+  images/            deployment-owned Dockerfiles (platform, verticals, web, simulators)
+                     plus the build-context table
   compose/           docker-compose.yml, gateway/nginx/initdb configuration, .env.example
   k8s/               namespace, configmaps, secret placeholder, postgres, platform,
-                     shell, ingress, verticals/*.yaml, kustomization.yaml
+                     shell, web remotes, FS-RI simulator, ingress, verticals/*.yaml,
+                     kustomization.yaml
   helm/eia/          Chart.yaml, values.yaml, templates/, files/
   scripts/           build-images, compose-up/down, deploy-kind, deploy-minikube, validate
 ```
@@ -75,11 +63,11 @@ repos/eia-ops/
 |---|---|---|
 | JDK | 22 (`C:\Program Files\Eclipse Adoptium\jdk-22.0.2.9-hotspot`) | Every Java repo pins the Java 22 toolchain |
 | Gradle | 8.14.3 (wrapper committed) | `scripts/build-images.ps1` calls `gradlew.bat` |
-| Docker Desktop | 29.8.2 client / Compose v5.6.0 | Requires the WSL2 reboot above |
+| Docker Desktop | 29.9.1 server / Compose v5.6.0 | Linux engine running (WSL2 active) |
 | kubectl | v1.36.1 | Shipped with Docker Desktop at `resources\bin` |
 | kind | optional | `deploy-kind.ps1` fails clearly when it is absent |
-| minikube | v1.39.0 | `C:\Program Files\Kubernetes\Minikube\minikube.exe` |
-| Helm | 3.x, optional | Chart validated with Helm 3.16.3; not on `PATH` yet |
+| minikube | v1.39.0 (node v1.37.0) | Profile `minikube`, driver docker, running |
+| Helm | 4.3.1 | On `PATH`; `validate.ps1` runs `helm lint` and `helm template` |
 | Python | 3.12.8 + PyYAML 6.0.3 | Required by `scripts/validate.ps1` |
 
 The scripts look on `PATH` first, then at the standard install locations listed in
@@ -95,13 +83,16 @@ This runs `gradlew.bat bootJar -x test` in each owning repository and builds:
 
 - `eia/gateway:local`, `eia/auth:local`, `eia/config:local`, `eia/lineage:local`
 - `eia/<vertical>-expert:local` and `eia/<vertical>-domain:local` for all ten verticals
+- `eia/<vertical>-web:local` for the ten federated web remotes (from each web repo's `dist/`)
+- `eia/fsri-simulator:local` for the FS-RI test double (from `repos/eia-quality`)
 - `eia/shell:local` from the existing `dist/`
 
 Useful switches: `-Tag <tag>`, `-SkipGradle` (reuse jars), `-SkipJava`, `-SkipShell`,
-`-BuildFrontend` (run `npm ci` + `npm run build` before packaging the shell).
+`-SkipWeb`, `-SkipSimulators`, `-BuildFrontend` (run `npm ci` + `npm run build` in the shell
+and in every web-remote repository before packaging).
 
-Build contexts, including why 16 Dockerfiles live here instead of in the owning repositories,
-are in [`images/README.md`](images/README.md). Manual example:
+Build contexts, including why the Java Dockerfiles live here instead of in the owning
+repositories, are in [`images/README.md`](images/README.md). Manual example:
 
 ```powershell
 Set-Location repos/eia-platform
@@ -130,14 +121,16 @@ docker compose -f compose/docker-compose.yml ps
 docker compose -f compose/docker-compose.yml down
 ```
 
-The stack contains PostgreSQL, the four platform services, the shell, and 20 vertical services
-(26 containers). The shell is at <http://localhost:3000>; its nginx `/api` proxy forwards to the
-gateway. See [`compose/README.md`](compose/README.md).
+The stack contains PostgreSQL, the four platform services, the shell, 20 vertical services,
+the ten federated web remotes, and the FS-RI simulator (37 containers). The shell is at
+<http://localhost:3000>; its nginx `/api` proxy forwards to the gateway and its
+`/remotes/<vertical>/` proxies forward to the web remotes. See
+[`compose/README.md`](compose/README.md).
 
 ## Kubernetes
 
-Plain manifests (namespace `eia-local`, 26 Deployments, 26 Services, 4 ConfigMaps, 1 Secret,
-1 PVC, 1 Ingress):
+Plain manifests (namespace `eia-local`, 37 Deployments, 37 Services, 4 ConfigMaps, 1 Secret,
+1 PVC, 2 Ingresses):
 
 ```powershell
 kubectl apply -k k8s
@@ -180,7 +173,8 @@ helm uninstall eia --namespace eia-local
 
 Values expose every image tag and service port (`global.imageTag`, per-service
 `image.repository`/`image.tag`, `platform.*.port`, `verticals.*.{expert,domain}.port`,
-`shell.port`, `postgres.servicePort`). See [`helm/eia/README.md`](helm/eia/README.md).
+`web.*.port`, `simulators.fsri.port`, `shell.port`, `postgres.servicePort`). See
+[`helm/eia/README.md`](helm/eia/README.md).
 
 ## Service ports and health endpoints
 
@@ -204,6 +198,8 @@ The shell exposes nginx `/healthz`.
 | Document expert / domain | 8095 / 8096 | `/actuator/health` |
 | Payment expert / domain | 8097 / 8098 | `/actuator/health` |
 | Notifications expert / domain | 8099 / 8100 | `/actuator/health` |
+| Web remotes (`eia-<vertical>-web`) | 80 (Compose host 3001-3010) | `/healthz` |
+| FS-RI simulator | 8181 | `/sim/fsri/health` |
 | PostgreSQL | 5432 | `pg_isready` |
 
 The databases are `eia_party`, `eia_policy`, `eia_contract`, `eia_direct`, `eia_assumed`,
@@ -224,25 +220,26 @@ The script runs these checks without a Docker engine or cluster:
    merge keys resolved), plus cross-file invariants for Compose, Dockerfiles, Kubernetes, and
    Helm; optionally parses the rendered kustomize and Helm output.
 
-Last recorded run (2026-10-19, before the Docker engine blocker was cleared):
+Recorded after the web remotes and FS-RI simulator were added (2026-10-19):
 
 ```text
 docker compose config ......... OK
-kubectl kustomize ............. 60 objects
+kubectl kustomize ............. 83 objects
 helm lint ..................... 1 chart linted, 0 failed
-helm template ................. 60 objects
-YAML parse .................... 27 files, 70 documents (PyYAML 6.0.3)
-Dockerfiles ................... 16 deployment-owned + 9 owning-repository files OK
-Compose catalog ............... 26 services, ports/build contexts OK
-Kubernetes .................... 26 Deployments, 26 Services, probes/Secrets/Ingress OK
-Helm .......................... ports, tags, files, 8 templates OK
-Rendered output ............... kustomize 60 objects, helm 59 objects; probes and ports OK
-RESULT: PASS - 41 checks
+helm template ................. 82 objects
+YAML parse .................... 29 files, 93 documents (PyYAML 6.0.3)
+Dockerfiles ................... 16 deployment Java + web-remote + FS-RI simulator + 9 owning-repository files OK
+Compose catalog ............... 37 services, ports/build contexts/FS-RI wiring OK
+Kubernetes .................... 37 Deployments, 37 Services, probes/Secrets/Ingress eia-remotes OK
+Helm .......................... ports, tags, files, 11 templates OK
+Rendered output ............... kustomize 83 objects, helm 82 objects; probes and ports OK
+RESULT: PASS - 45 checks
 ```
 
 Kubernetes probes are defined for every Deployment: HTTP `/actuator/health` for Java services,
-`pg_isready` for PostgreSQL, and `/healthz` for the shell. The manifests also set resource
-requests/limits, non-root Java pods, read-only root filesystems, and a `/tmp` emptyDir.
+`/healthz` for the shell and web remotes, `/sim/fsri/health` for the FS-RI simulator, and
+`pg_isready` for PostgreSQL. The manifests also set resource requests/limits, non-root Java
+pods, read-only root filesystems, and a `/tmp` emptyDir.
 
 ## Secrets
 
@@ -258,11 +255,17 @@ requests/limits, non-root Java pods, read-only root filesystems, and a `/tmp` em
 
 ## Scope and known limitations
 
-- The ten vertical **web remotes** are static front-ends and are not part of this stack. Run them
-  with `npm start` in each `eia-<vertical>-web` repository (ports 3001-3010); the shell bundle
-  contains build-time `localhost:3001-3010` remote URLs from `eia-frontend/shell/webpack.config.js`.
-  Serving the federated UI entirely from a cluster requires rebuilding that bundle with cluster
-  URLs, which is an application-repository change outside this task.
+- The ten federated **web remotes** are deployed by this stack: `eia/<vertical>-web:local`,
+  served on port 80, routed by Ingress `eia-remotes` at `/remotes/<vertical>(/|$)(.*)` with an
+  nginx rewrite, and proxied identically by the shell nginx for `kubectl port-forward` and
+  Compose. The shell bundle consumes relative `/remotes/<vertical>/remoteEntry.js` URLs. This
+  is still a **build-time Module Federation remote map**, not the signed runtime manifest of
+  SPEC 5.3/5.4: no manifest signature, SRI, canary/killSwitch, or fallback version is
+  implemented.
+- The **FS-RI simulator** is the eia-quality test double (SPEC 15.3), not the production SAP
+  FS-RI adapter. Cession-domain and retrocession-domain reach it at
+  `http://eia-fsri-simulator:8181`; the simulator is single-replica and in-memory, so its
+  records reset on pod restart.
 - The auth service still advertises `http://localhost:9000` as its issuer and uses an in-memory
   user/client registry (application code, not deployment configuration).
 - Local only: single PostgreSQL replica, no backup/PITR, no TLS/mTLS, no blue/green or canary.

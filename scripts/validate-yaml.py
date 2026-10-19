@@ -42,6 +42,23 @@ VERTICALS = {
 SHELL_PORT = 80
 SHELL_HOST_PORT = 3000
 POSTGRES_PORT = 5432
+FSRI_PORT = 8181
+FSRI_BASE_URL = "http://eia-fsri-simulator:8181"
+
+# Federated web remotes: vertical -> Compose host port (container port is always 80).
+WEB_VERTICALS = {
+    "party": 3001,
+    "policy": 3002,
+    "contract": 3003,
+    "direct-claims": 3004,
+    "assumed-claims": 3005,
+    "cession": 3006,
+    "retrocession": 3007,
+    "document": 3008,
+    "payment": 3009,
+    "notifications": 3010,
+}
+WEB_PORT = 80
 
 OPS_DOCKERFILES = {
     "gateway": ("images/platform/gateway.Dockerfile", 8080),
@@ -109,6 +126,9 @@ def expected_images():
         images[f"eia-{vertical}-domain"] = (f"eia/{vertical}-domain:local", tiers["domain"])
     images["eia-shell"] = ("eia/shell:local", SHELL_PORT)
     images["eia-postgres"] = ("postgres:17-alpine", POSTGRES_PORT)
+    for vertical in WEB_VERTICALS:
+        images[f"eia-{vertical}-web"] = (f"eia/{vertical}-web:local", WEB_PORT)
+    images["eia-fsri-simulator"] = ("eia/fsri-simulator:local", FSRI_PORT)
     return images
 
 
@@ -173,7 +193,7 @@ def check_compose(root: Path, report: Report):
     services = compose.get("services", {})
     catalog = expected_images()
 
-    report.require(set(services) == set(catalog), f"service set matches the 26-service catalog ({len(services)} found)")
+    report.require(set(services) == set(catalog), f"service set matches the {len(catalog)}-service catalog ({len(services)} found)")
     if set(services) != set(catalog):
         report.fail(f"unexpected: {sorted(set(services) - set(catalog))}; missing: {sorted(set(catalog) - set(services))}")
 
@@ -186,7 +206,12 @@ def check_compose(root: Path, report: Report):
             report.fail(f"{name}: expected exactly one host:container port mapping")
             continue
         host, container = str(mappings[0]).split(":", 1)
-        expected_host = SHELL_HOST_PORT if name == "eia-shell" else port
+        if name == "eia-shell":
+            expected_host = SHELL_HOST_PORT
+        elif name.startswith("eia-") and name.endswith("-web"):
+            expected_host = WEB_VERTICALS.get(name[4:-4])
+        else:
+            expected_host = port
         if (host, container) != (str(expected_host), str(port)):
             ports_ok = False
             report.fail(f"{name}: port mapping {host}:{container} expected {expected_host}:{port}")
@@ -233,6 +258,18 @@ def check_compose(root: Path, report: Report):
             env_ok = False
             report.fail(f"eia-{vertical}-domain: SPRING_APPLICATION_JSON invalid ({exc})")
     report.require(env_ok, "domain/expert environment bindings match the service catalog")
+
+    fsri_ok = True
+    for vertical in ("cession", "retrocession"):
+        domain_env = services.get(f"eia-{vertical}-domain", {}).get("environment", {})
+        if domain_env.get("EIA_FSRI_BASE_URL") != FSRI_BASE_URL:
+            fsri_ok = False
+            report.fail(f"eia-{vertical}-domain: EIA_FSRI_BASE_URL is not {FSRI_BASE_URL}")
+    simulator = services.get("eia-fsri-simulator", {})
+    if simulator.get("build", {}).get("dockerfile") != "../eia-ops/images/simulators/fsri.Dockerfile":
+        fsri_ok = False
+        report.fail("eia-fsri-simulator: deployment-owned Dockerfile is not used")
+    report.require(fsri_ok, "FS-RI simulator is in Compose and the domains point at it")
 
     mounts_ok = True
     gateway = services.get("eia-gateway", {})
@@ -283,6 +320,30 @@ def check_images(root: Path, report: Report):
             report.fail(f"{relative}: java entrypoint missing")
     report.require(ok, f"{len(OPS_DOCKERFILES)} deployment-owned Dockerfiles target Gradle build/libs and the correct port")
 
+    web_ok = True
+    web_dockerfile = root / "images" / "web" / "remote.Dockerfile"
+    if not web_dockerfile.is_file():
+        web_ok = False
+        report.fail("missing deployment Dockerfile images/web/remote.Dockerfile")
+    else:
+        text = web_dockerfile.read_text(encoding="utf-8")
+        if "COPY dist/" not in text or "EXPOSE 80" not in text or "try_files $uri $uri/ /index.html" not in text:
+            web_ok = False
+            report.fail("images/web/remote.Dockerfile must copy dist/, serve the SPA fallback and EXPOSE 80")
+    report.require(web_ok, "the web-remote Dockerfile packages each dist bundle on port 80 with index.html fallback")
+
+    simulator_ok = True
+    fsri_dockerfile = root / "images" / "simulators" / "fsri.Dockerfile"
+    if not fsri_dockerfile.is_file():
+        simulator_ok = False
+        report.fail("missing deployment Dockerfile images/simulators/fsri.Dockerfile")
+    else:
+        text = fsri_dockerfile.read_text(encoding="utf-8")
+        if "EXPOSE 8181" not in text or "simulators/fsri/server.mjs" not in text:
+            simulator_ok = False
+            report.fail("images/simulators/fsri.Dockerfile must run simulators/fsri/server.mjs and EXPOSE 8181")
+    report.require(simulator_ok, "the FS-RI simulator Dockerfile exposes 8181 and starts the simulator entry point")
+
     repo_ok = True
     for name, repo in REPO_DOCKERFILES.items():
         path = repos / repo / "Dockerfile"
@@ -308,8 +369,8 @@ def check_kubernetes(root: Path, report: Report):
     expected = expected_images()
     deployments = {obj["metadata"]["name"]: obj for obj in kinds.get("Deployment", [])}
     services = {obj["metadata"]["name"]: obj for obj in kinds.get("Service", [])}
-    report.require(set(deployments) == set(expected), f"26 Deployments present ({len(deployments)} found)")
-    report.require(set(services) == set(expected), f"26 Services present ({len(services)} found)")
+    report.require(set(deployments) == set(expected), f"{len(expected)} Deployments present ({len(deployments)} found)")
+    report.require(set(services) == set(expected), f"{len(expected)} Services present ({len(services)} found)")
 
     namespace_ok = all(
         obj["metadata"].get("namespace") == NAMESPACE
@@ -334,6 +395,12 @@ def check_kubernetes(root: Path, report: Report):
         if name == "eia-shell":
             paths = ["/healthz"]
             need_startup = False
+        elif name.endswith("-web"):
+            paths = ["/healthz"]
+            need_startup = False
+        elif name == "eia-fsri-simulator":
+            paths = ["/sim/fsri/health"]
+            need_startup = True
         elif name == "eia-postgres":
             paths = []
             need_startup = True
@@ -405,11 +472,30 @@ def check_kubernetes(root: Path, report: Report):
         "Secret eia-db is a placeholder, not a real credential",
     )
 
-    ingress = (kinds.get("Ingress") or [{}])[0]
+    ingresses = {obj["metadata"]["name"]: obj for obj in kinds.get("Ingress", [])}
+    ingress = ingresses.get("eia", {})
     rules = ingress.get("spec", {}).get("rules", [])
     hosts = [rule.get("host") for rule in rules]
     paths = {path.get("path") for rule in rules for path in rule.get("http", {}).get("paths", [])}
     report.require(hosts == ["eia.local"] and {"/api", "/"} <= paths, "Ingress targets eia.local with /api and / paths")
+
+    remotes_ingress = ingresses.get("eia-remotes", {})
+    remote_rules = remotes_ingress.get("spec", {}).get("rules", [])
+    remote_annotations = remotes_ingress.get("metadata", {}).get("annotations", {})
+    remote_paths = [
+        (path.get("path"), path.get("backend", {}).get("service", {}).get("name"))
+        for rule in remote_rules
+        for path in rule.get("http", {}).get("paths", [])
+    ]
+    expected_remote_backends = {f"eia-{vertical}-web" for vertical in WEB_VERTICALS}
+    remotes_ok = (
+        len(remote_paths) == len(WEB_VERTICALS)
+        and {backend for _, backend in remote_paths} == expected_remote_backends
+        and all(path.startswith("/remotes/") and path.endswith("(/|$)(.*)") for path, _ in remote_paths)
+        and remote_annotations.get("nginx.ingress.kubernetes.io/rewrite-target") == "/$2"
+        and str(remote_annotations.get("nginx.ingress.kubernetes.io/use-regex")).lower() == "true"
+    )
+    report.require(remotes_ok, "Ingress eia-remotes rewrites /remotes/<vertical> to the ten web Services")
 
     pvc = (kinds.get("PersistentVolumeClaim") or [{}])[0]
     report.require(
@@ -446,6 +532,9 @@ def check_helm(root: Path, report: Report):
         ports[f"eia-{vertical}-domain"] = tiers["domain"]["port"]
     ports["eia-shell"] = values["shell"]["port"]
     ports["eia-postgres"] = values["postgres"]["servicePort"]
+    for vertical, web in values.get("web", {}).items():
+        ports[f"eia-{vertical}-web"] = web["port"]
+    ports["eia-fsri-simulator"] = values["simulators"]["fsri"]["port"]
     expected_ports = {name: port for name, (_, port) in expected_images().items()}
     report.require(ports == expected_ports, "values.yaml ports match every service port")
 
@@ -461,6 +550,10 @@ def check_helm(root: Path, report: Report):
         short = name[4:]
         if short == "shell":
             image = values["shell"]["image"]
+        elif short == "fsri-simulator":
+            image = values["simulators"]["fsri"]["image"]
+        elif short.endswith("-web") and short[:-4] in values.get("web", {}):
+            image = values["web"][short[:-4]]["image"]
         elif "-" in short and short.rsplit("-", 1)[-1] in ("expert", "domain"):
             vertical, tier = short.rsplit("-", 1)
             image = values["verticals"][vertical][tier]["image"]
@@ -523,8 +616,9 @@ def check_rendered(path: Path, label: str, report: Report, expected_objects: int
     deployments = [obj for obj in objects if obj.get("kind") == "Deployment"]
     services = [obj for obj in objects if obj.get("kind") == "Service"]
     report.require(len(objects) == expected_objects, f"{expected_objects} objects rendered ({len(objects)} found)")
-    report.require(len(deployments) == 26, f"26 Deployments rendered ({len(deployments)} found)")
-    report.require(len(services) == 26, f"26 Services rendered ({len(services)} found)")
+    expected_workloads = len(expected_images())
+    report.require(len(deployments) == expected_workloads, f"{expected_workloads} Deployments rendered ({len(deployments)} found)")
+    report.require(len(services) == expected_workloads, f"{expected_workloads} Services rendered ({len(services)} found)")
     probe_ok = all(
         "readinessProbe" in container and "livenessProbe" in container
         for deployment in deployments
@@ -555,9 +649,11 @@ def main():
     check_kubernetes(root, report)
     check_helm(root, report)
     if args.kubectl_rendered:
-        check_rendered(args.kubectl_rendered, "kubectl kustomize", report, 60)
+        # Deployments + Services + 4 ConfigMaps + Secret + PVC + Namespace + 2 Ingresses.
+        check_rendered(args.kubectl_rendered, "kubectl kustomize", report, len(expected_images()) * 2 + 9)
     if args.helm_rendered:
-        check_rendered(args.helm_rendered, "helm template", report, 59)
+        # Deployments + Services + 4 ConfigMaps + Secret + PVC + 2 Ingresses (no Namespace).
+        check_rendered(args.helm_rendered, "helm template", report, len(expected_images()) * 2 + 8)
 
     print()
     if report.failures:
