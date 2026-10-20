@@ -35,6 +35,9 @@ helm upgrade --install eia helm/eia --namespace eia-local `
   `web.<vertical>.port`, `simulators.fsri.port`, and `postgres.servicePort` for service ports.
 - `verticals.cession.domain.fsriBaseUrl` and `verticals.retrocession.domain.fsriBaseUrl`
   set `EIA_FSRI_BASE_URL` for the two reinsurance-administration domains.
+- `verticals.party.domain.database` and `verticals.policy.domain.database` enable the
+  `EIA_<VERTICAL>_DB_*` read-model datasource env for the two search-enabled domains;
+  credentials come from the same `eia-db` Secret.
 - `postgres.auth` for local credentials; the placeholder is created only when
   `existingSecret` is empty.
 - `eventSigning.secret` (or `eventSigning.existingSecret`) is the shared HMAC secret used by

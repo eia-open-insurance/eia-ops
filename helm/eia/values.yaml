@@ -91,6 +91,7 @@ verticals:
         repository: eia/party-domain
         tag: local
       port: 8082
+      database: eia_party
   policy:
     expert:
       image:
@@ -103,6 +104,7 @@ verticals:
         repository: eia/policy-domain
         tag: local
       port: 8084
+      database: eia_policy
   contract:
     expert:
       image:

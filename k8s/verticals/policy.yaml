@@ -154,6 +154,18 @@ spec:
               value: "-Xms32m -Xmx256m -XX:+UseSerialGC"
             - name: SPRING_APPLICATION_JSON
               value: '{"eia":{"policy":{"expert-url":"http://eia-policy-expert:8083"}}}'
+            - name: EIA_POLICY_DB_URL
+              value: jdbc:postgresql://eia-postgres:5432/eia_policy
+            - name: EIA_POLICY_DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: eia-db
+                  key: POSTGRES_USER
+            - name: EIA_POLICY_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: eia-db
+                  key: POSTGRES_PASSWORD
           resources:
             requests:
               cpu: 50m

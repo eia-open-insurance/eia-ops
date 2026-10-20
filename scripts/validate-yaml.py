@@ -40,6 +40,19 @@ VERTICALS = {
     "notifications": {"expert": 8099, "domain": 8100, "database": "eia_notifications"},
 }
 
+# Domains that query PostgreSQL directly for their search read model. The other
+# eight domains proxy their expert and must not receive datasource configuration.
+DATASOURCE_DOMAINS = ("party", "policy")
+
+
+def domain_db_env(vertical: str, suffix: str) -> str:
+    return f"EIA_{vertical.upper().replace('-', '_')}_DB_{suffix}"
+
+
+def is_datasource_env(name: str) -> bool:
+    return name.startswith("SPRING_DATASOURCE_") or (name.startswith("EIA_") and "_DB_" in name)
+
+
 SHELL_PORT = 80
 SHELL_HOST_PORT = 3000
 POSTGRES_PORT = 5432
@@ -269,6 +282,30 @@ def check_compose(root: Path, report: Report):
             env_ok = False
             report.fail(f"eia-{vertical}-domain: SPRING_APPLICATION_JSON invalid ({exc})")
     report.require(env_ok, "domain/expert environment bindings match the service catalog")
+
+    domain_db_ok = True
+    for vertical, tiers in VERTICALS.items():
+        env = services.get(f"eia-{vertical}-domain", {}).get("environment", {})
+        if vertical in DATASOURCE_DOMAINS:
+            url = env.get(domain_db_env(vertical, "URL"))
+            if url != f"jdbc:postgresql://eia-postgres:5432/{tiers['database']}":
+                domain_db_ok = False
+                report.fail(f"eia-{vertical}-domain: {domain_db_env(vertical, 'URL')} is wrong")
+            if env.get(domain_db_env(vertical, "USERNAME")) != "${POSTGRES_USER:-eia}":
+                domain_db_ok = False
+                report.fail(f"eia-{vertical}-domain: {domain_db_env(vertical, 'USERNAME')} is not POSTGRES_USER")
+            if "${POSTGRES_PASSWORD:-" not in str(env.get(domain_db_env(vertical, "PASSWORD"))):
+                domain_db_ok = False
+                report.fail(f"eia-{vertical}-domain: {domain_db_env(vertical, 'PASSWORD')} is not POSTGRES_PASSWORD")
+        else:
+            unexpected = sorted(name for name in env if is_datasource_env(name))
+            if unexpected:
+                domain_db_ok = False
+                report.fail(f"eia-{vertical}-domain: proxy domain has datasource env {unexpected}")
+    report.require(
+        domain_db_ok,
+        "party/policy domains bind their read-model datasource from .env; the eight proxy domains have none",
+    )
 
     ingest = services.get("eia-event-ingest", {})
     ingest_env = ingest.get("environment", {})
@@ -516,6 +553,29 @@ def check_kubernetes(root: Path, report: Report):
             report.fail(f"eia-{vertical}-expert: EIA_OUTBOX_SIGNING_SECRET does not use the shared Secret")
     report.require(outbox_ok, "all ten expert Deployments enable the outbox against event-ingest")
 
+    domain_db_ok = True
+    for vertical, tiers in VERTICALS.items():
+        container = deployments[f"eia-{vertical}-domain"]["spec"]["template"]["spec"]["containers"][0]
+        env = {item["name"]: item for item in container.get("env", [])}
+        if vertical in DATASOURCE_DOMAINS:
+            if env.get(domain_db_env(vertical, "URL"), {}).get("value") != f"jdbc:postgresql://eia-postgres:5432/{tiers['database']}":
+                domain_db_ok = False
+                report.fail(f"eia-{vertical}-domain: {domain_db_env(vertical, 'URL')} Deployment value is wrong")
+            for suffix, key in (("USERNAME", "POSTGRES_USER"), ("PASSWORD", "POSTGRES_PASSWORD")):
+                ref = env.get(domain_db_env(vertical, suffix), {}).get("valueFrom", {}).get("secretKeyRef", {})
+                if ref.get("name") != "eia-db" or ref.get("key") != key:
+                    domain_db_ok = False
+                    report.fail(f"eia-{vertical}-domain: {domain_db_env(vertical, suffix)} does not use eia-db/{key}")
+        else:
+            unexpected = sorted(name for name in env if is_datasource_env(name))
+            if unexpected:
+                domain_db_ok = False
+                report.fail(f"eia-{vertical}-domain: proxy Deployment has datasource env {unexpected}")
+    report.require(
+        domain_db_ok,
+        "party/policy domain Deployments bind the read model via the eia-db Secret; the eight proxy domains have none",
+    )
+
     ingest_container = deployments["eia-event-ingest"]["spec"]["template"]["spec"]["containers"][0]
     ingest_env = {item["name"]: item for item in ingest_container.get("env", [])}
     ingest_key_ref = ingest_env.get("EIA_EVENT_SIGNING_SECRET", {}).get("valueFrom", {}).get("secretKeyRef", {})
@@ -700,6 +760,34 @@ def check_rendered(path: Path, label: str, report: Report, expected_objects: int
     expected_ports = {name: port for name, (_, port) in expected_images().items()}
     rendered_ports = {service["metadata"]["name"]: service["spec"]["ports"][0]["port"] for service in services}
     report.require(rendered_ports == expected_ports, "rendered Service ports match the catalog")
+
+    domain_db_ok = True
+    for deployment in deployments:
+        name = deployment["metadata"]["name"]
+        if not name.startswith("eia-") or not name.endswith("-domain"):
+            continue
+        vertical = name[len("eia-") : -len("-domain")]
+        container = deployment["spec"]["template"]["spec"]["containers"][0]
+        env = {item["name"]: item for item in container.get("env", [])}
+        if vertical in DATASOURCE_DOMAINS:
+            expected_url = f"jdbc:postgresql://eia-postgres:5432/{VERTICALS[vertical]['database']}"
+            if env.get(domain_db_env(vertical, "URL"), {}).get("value") != expected_url:
+                domain_db_ok = False
+                report.fail(f"{label}: {name} {domain_db_env(vertical, 'URL')} is wrong")
+            for suffix, key in (("USERNAME", "POSTGRES_USER"), ("PASSWORD", "POSTGRES_PASSWORD")):
+                ref = env.get(domain_db_env(vertical, suffix), {}).get("valueFrom", {}).get("secretKeyRef", {})
+                if ref.get("name") != "eia-db" or ref.get("key") != key:
+                    domain_db_ok = False
+                    report.fail(f"{label}: {name} {domain_db_env(vertical, suffix)} does not use eia-db/{key}")
+        else:
+            unexpected = sorted(env_name for env_name in env if is_datasource_env(env_name))
+            if unexpected:
+                domain_db_ok = False
+                report.fail(f"{label}: {name} proxy Deployment has datasource env {unexpected}")
+    report.require(
+        domain_db_ok,
+        "rendered party/policy domains carry the datasource envs; the eight proxy domains do not",
+    )
 
 
 def main():

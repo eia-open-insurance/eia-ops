@@ -147,6 +147,9 @@ services:
     environment:
       <<: *java-environment
       SPRING_APPLICATION_JSON: '{"eia":{"party":{"expert-url":"http://eia-party-expert:8081"}}}'
+      EIA_PARTY_DB_URL: jdbc:postgresql://eia-postgres:5432/eia_party
+      EIA_PARTY_DB_USERNAME: ${POSTGRES_USER:-eia}
+      EIA_PARTY_DB_PASSWORD: ${POSTGRES_PASSWORD:-replace-me-local-only}
     depends_on:
       eia-party-expert:
         condition: service_started
@@ -183,6 +186,9 @@ services:
     environment:
       <<: *java-environment
       SPRING_APPLICATION_JSON: '{"eia":{"policy":{"expert-url":"http://eia-policy-expert:8083"}}}'
+      EIA_POLICY_DB_URL: jdbc:postgresql://eia-postgres:5432/eia_policy
+      EIA_POLICY_DB_USERNAME: ${POSTGRES_USER:-eia}
+      EIA_POLICY_DB_PASSWORD: ${POSTGRES_PASSWORD:-replace-me-local-only}
     depends_on:
       eia-policy-expert:
         condition: service_started

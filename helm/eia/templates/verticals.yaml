@@ -154,6 +154,20 @@ spec:
               value: {{ $.Values.global.javaToolOptions | quote }}
             - name: SPRING_APPLICATION_JSON
               value: {{ printf "{\"eia\":{\"%s\":{\"expert-url\":\"http://eia-%s-expert:%d\"}}}" $vertical $vertical (int $expert.port) | quote }}
+{{- if $domain.database }}
+            - name: EIA_{{ $vertical | upper | replace "-" "_" }}_DB_URL
+              value: {{ printf "jdbc:postgresql://eia-postgres:%d/%s" (int $.Values.postgres.servicePort) $domain.database | quote }}
+            - name: EIA_{{ $vertical | upper | replace "-" "_" }}_DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $dbSecret }}
+                  key: POSTGRES_USER
+            - name: EIA_{{ $vertical | upper | replace "-" "_" }}_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $dbSecret }}
+                  key: POSTGRES_PASSWORD
+{{- end }}
 {{- if $domain.fsriBaseUrl }}
             - name: EIA_FSRI_BASE_URL
               value: {{ $domain.fsriBaseUrl | quote }}

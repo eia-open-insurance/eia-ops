@@ -38,7 +38,7 @@ the outbox wiring, and the web remotes:
 | Federated UI | Playwright `tests/live-all.spec.js` with `EIA_LIVE=1`: 11/11 through `kubectl port-forward svc/eia-shell 3000:80` |
 | FS-RI hand-off | cession `CES-000000001`: OPEN → RULE_APPLIED → `HANDED_OFF`, `fsriStatus=POSTED`, `FSRI-CES-DIRECT-000001` |
 | Outbox -> inbox | party `PTY-000000004` event `5bd6b801-6dca-540c-ab3f-2301e3527214`: outbox PUBLISHED, inbox PROCESSED, `signatureVerified=true` |
-| `scripts/validate.ps1` | PASS, 50 checks |
+| `scripts/validate.ps1` | PASS, 54 checks |
 
 The earlier blocker (the WSL2 optional component required a Windows restart before Docker
 Desktop's Linux engine and minikube could run) is resolved; the remediation was the recorded
@@ -212,6 +212,17 @@ with `EIA_OUTBOX_ENDPOINT=http://eia-event-ingest:8102/internal/events` and the 
 `eia-event-signing` Secret; `/internal/events` is cluster-only (no Ingress path, NetworkPolicy
 on port 8102).
 
+## Search endpoints and domain read models
+
+`party-domain` and `policy-domain` also expose tenant-scoped global search:
+`GET /api/v1/parties/search?q=&limit=` and `GET /api/v1/policies/search?q=&limit=`. Both require
+`X-EIA-Tenant`; Policy additionally requires `X-EIA-Book: DIRECT`. Each queries its own
+PostgreSQL read model directly, so these two domains receive
+`EIA_PARTY_DB_{URL,USERNAME,PASSWORD}` / `EIA_POLICY_DB_{URL,USERNAME,PASSWORD}`: Compose
+substitutes `POSTGRES_USER` / `POSTGRES_PASSWORD` from `.env`, while the Kubernetes manifests
+and Helm chart reference the `eia-db` Secret. The other eight domains are expert proxies, add
+no JDBC, and receive no datasource environment.
+
 ## Validation
 
 ```powershell
@@ -239,8 +250,8 @@ Dockerfiles ................... 17 deployment Java + web-remote + FS-RI simulato
 Compose catalog ............... 38 services, ports/build contexts/FS-RI/outbox wiring OK
 Kubernetes .................... 38 Deployments, 38 Services, 2 Secrets, NetworkPolicy, Ingress OK
 Helm .......................... ports, tags, files, 12 templates OK
-Rendered output ............... kustomize 87 objects, helm 86 objects; probes and ports OK
-RESULT: PASS - 50 checks
+Rendered output ............... kustomize 87 objects, helm 86 objects; probes, ports, datasource envs OK
+RESULT: PASS - 54 checks
 ```
 
 Kubernetes probes are defined for every Deployment: HTTP `/actuator/health` for Java services,
