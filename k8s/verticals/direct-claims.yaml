@@ -154,6 +154,8 @@ spec:
               value: "-Xms32m -Xmx256m -XX:+UseSerialGC"
             - name: SPRING_APPLICATION_JSON
               value: '{"eia":{"direct-claims":{"expert-url":"http://eia-direct-claims-expert:8087"}}}'
+            - name: EIA_POLICY_BASE_URL
+              value: http://eia-policy-domain:8084
           resources:
             requests:
               cpu: 50m
