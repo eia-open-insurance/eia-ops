@@ -1,0 +1,147 @@
+# Event ingest / inbox service (SPEC 7.5.1-7.5.2).
+#
+# The internal endpoint POST /internal/events is cluster-only: the Ingress does
+# not publish /internal and the NetworkPolicy below admits only pods from this
+# namespace that carry the platform part-of label. The dashboard read API
+# /api/v1/events/** is reached through the gateway.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eia-event-ingest
+  namespace: eia-local
+  labels:
+    app.kubernetes.io/name: eia-event-ingest
+    app.kubernetes.io/component: platform
+    app.kubernetes.io/part-of: eia-open-insurance
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: eia-event-ingest
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: eia-event-ingest
+        app.kubernetes.io/component: platform
+        app.kubernetes.io/part-of: eia-open-insurance
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: event-ingest
+          image: eia/event-ingest:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8102
+          env:
+            - name: JAVA_TOOL_OPTIONS
+              value: "-Xms32m -Xmx256m -XX:+UseSerialGC"
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://eia-postgres:5432/eia_platform"
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: eia-db
+                  key: POSTGRES_USER
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: eia-db
+                  key: POSTGRES_PASSWORD
+            - name: SPRING_SQL_INIT_MODE
+              value: "always"
+            - name: EIA_EVENT_SIGNING_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: eia-event-signing
+                  key: EIA_EVENT_SIGNING_SECRET
+            - name: EIA_EVENT_MAX_RECENT_LIMIT
+              value: "200"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 5
+            failureThreshold: 36
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 20
+            failureThreshold: 3
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: eia-event-ingest
+  namespace: eia-local
+  labels:
+    app.kubernetes.io/name: eia-event-ingest
+    app.kubernetes.io/component: platform
+    app.kubernetes.io/part-of: eia-open-insurance
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: eia-event-ingest
+  ports:
+    - name: http
+      port: 8102
+      targetPort: http
+      protocol: TCP
+---
+# Defense in depth for the inbox: only platform pods in this namespace can
+# reach port 8102. The Ingress controller is in ingress-nginx and is therefore
+# outside this policy even if an /internal path were added later.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: eia-event-ingest
+  namespace: eia-local
+  labels:
+    app.kubernetes.io/name: eia-event-ingest
+    app.kubernetes.io/component: platform
+    app.kubernetes.io/part-of: eia-open-insurance
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: eia-event-ingest
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: eia-open-insurance
+      ports:
+        - protocol: TCP
+          port: 8102

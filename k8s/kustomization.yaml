@@ -6,6 +6,7 @@ resources:
   - 02-secret.yaml
   - 10-postgres.yaml
   - 20-platform.yaml
+  - 21-event-ingest.yaml
   - 30-shell.yaml
   - 31-web.yaml
   - 36-fsri-simulator.yaml

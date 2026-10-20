@@ -54,6 +54,15 @@ spec:
                   key: POSTGRES_PASSWORD
             - name: SPRING_SQL_INIT_MODE
               value: "always"
+            - name: EIA_OUTBOX_ENABLED
+              value: "true"
+            - name: EIA_OUTBOX_ENDPOINT
+              value: {{ printf "http://eia-event-ingest:%d/internal/events" (int (index $.Values.platform "event-ingest").port) | quote }}
+            - name: EIA_OUTBOX_SIGNING_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "eia.eventSigningSecretName" $ }}
+                  key: EIA_EVENT_SIGNING_SECRET
           resources:
 {{ toYaml $.Values.resources | indent 12 }}
           securityContext:

@@ -1,3 +1,4 @@
+{{- $dbSecret := include "eia.dbSecretName" . -}}
 {{- range $name, $service := .Values.platform }}
 ---
 apiVersion: apps/v1
@@ -37,6 +38,27 @@ spec:
           env:
             - name: JAVA_TOOL_OPTIONS
               value: {{ $.Values.global.javaToolOptions | quote }}
+{{- if eq $name "event-ingest" }}
+            - name: SPRING_DATASOURCE_URL
+              value: {{ printf "jdbc:postgresql://eia-postgres:%d/%s" (int $.Values.postgres.servicePort) $service.database | quote }}
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $dbSecret }}
+                  key: POSTGRES_USER
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $dbSecret }}
+                  key: POSTGRES_PASSWORD
+            - name: SPRING_SQL_INIT_MODE
+              value: "always"
+            - name: EIA_EVENT_SIGNING_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "eia.eventSigningSecretName" $ }}
+                  key: EIA_EVENT_SIGNING_SECRET
+{{- end }}
 {{- if eq $name "gateway" }}
             - name: SPRING_CONFIG_ADDITIONAL_LOCATION
               value: "file:/app/config/"

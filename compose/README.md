@@ -1,6 +1,6 @@
 # Compose stack (local)
 
-`docker-compose.yml` starts PostgreSQL, the four platform services, the shell, the
+`docker-compose.yml` starts PostgreSQL, the five platform services, the shell, the
 20 implemented vertical services (10 experts + 10 domains), the ten federated web remotes,
 and the FS-RI simulator test double in namespace-like DNS names that match the Kubernetes
 manifests.
@@ -14,7 +14,7 @@ manifests.
 | `config/gateway/application.yml` | Gateway routes to Compose service names; mounted into the gateway |
 | `config/server/application.yml` | Placeholder served by the native Config Server |
 | `nginx/default.conf` | Shell SPA fallback, `/healthz`, `/api` proxy to the gateway, and `/remotes/<vertical>/` rewrites to the web remotes |
-| `initdb/01-create-databases.sh` | Creates the ten `eia_*` databases on first start |
+| `initdb/01-create-databases.sh` | Creates the ten `eia_*` vertical databases plus `eia_platform` on first start |
 
 ## Use
 
@@ -42,6 +42,7 @@ docker compose -f compose/docker-compose.yml down -v
 | Auth | 9000 |
 | Config | 8888 |
 | Lineage | 8101 |
+| Event ingest | 8102 |
 | Party expert / domain | 8081 / 8082 |
 | Policy expert / domain | 8083 / 8084 |
 | Contract expert / domain | 8085 / 8086 |
@@ -60,3 +61,8 @@ Compose does not health-check the Java images (the JRE image has no HTTP client)
 explicit: experts wait for a healthy PostgreSQL, domains wait for their expert and the FS-RI
 simulator, and the shell waits for the gateway and the ten web remotes. Kubernetes probes
 provide the full health model.
+
+All ten expert services set `EIA_OUTBOX_ENABLED=true` and deliver to
+`http://eia-event-ingest:8102/internal/events` with the shared
+`EIA_EVENT_SIGNING_SECRET` (see `.env.example`). Event ingest is only reachable inside the
+Compose network for `/internal/events`; `/api/v1/events/**` is exposed through the gateway.

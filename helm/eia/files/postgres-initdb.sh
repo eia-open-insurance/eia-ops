@@ -14,7 +14,8 @@ for db in \
   eia_retrocession \
   eia_document \
   eia_payment \
-  eia_notifications
+  eia_notifications \
+  eia_platform
 do
   echo "creating database ${db}"
   psql --username "${POSTGRES_USER}" --dbname postgres --set ON_ERROR_STOP=1 \

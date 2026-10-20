@@ -49,6 +49,15 @@ spec:
                   key: POSTGRES_PASSWORD
             - name: SPRING_SQL_INIT_MODE
               value: "always"
+            - name: EIA_OUTBOX_ENABLED
+              value: "true"
+            - name: EIA_OUTBOX_ENDPOINT
+              value: "http://eia-event-ingest:8102/internal/events"
+            - name: EIA_OUTBOX_SIGNING_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: eia-event-signing
+                  key: EIA_EVENT_SIGNING_SECRET
           resources:
             requests:
               cpu: 50m

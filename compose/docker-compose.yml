@@ -97,6 +97,26 @@ services:
     ports:
       - "8101:8101"
 
+  # Event ingest / inbox (SPEC 7.5). Expert services deliver their outbox rows here.
+  eia-event-ingest:
+    <<: *java-service
+    image: eia/event-ingest:${EIA_TAG:-local}
+    build:
+      context: ../../eia-platform/event-ingest
+      dockerfile: ../../eia-ops/images/platform/event-ingest.Dockerfile
+    environment:
+      <<: *java-environment
+      SPRING_DATASOURCE_URL: jdbc:postgresql://eia-postgres:5432/eia_platform
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-eia}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-replace-me-local-only}
+      SPRING_SQL_INIT_MODE: always
+      EIA_EVENT_SIGNING_SECRET: ${EIA_EVENT_SIGNING_SECRET:-local-event-signing-secret-change-me}
+    depends_on:
+      eia-postgres:
+        condition: service_healthy
+    ports:
+      - "8102:8102"
+
   eia-party-expert:
     <<: *java-service
     image: eia/party-expert:${EIA_TAG:-local}
@@ -109,6 +129,9 @@ services:
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-eia}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-replace-me-local-only}
       SPRING_SQL_INIT_MODE: always
+      EIA_OUTBOX_ENABLED: "true"
+      EIA_OUTBOX_ENDPOINT: http://eia-event-ingest:8102/internal/events
+      EIA_OUTBOX_SIGNING_SECRET: ${EIA_EVENT_SIGNING_SECRET:-local-event-signing-secret-change-me}
     depends_on:
       eia-postgres:
         condition: service_healthy
@@ -142,6 +165,9 @@ services:
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-eia}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-replace-me-local-only}
       SPRING_SQL_INIT_MODE: always
+      EIA_OUTBOX_ENABLED: "true"
+      EIA_OUTBOX_ENDPOINT: http://eia-event-ingest:8102/internal/events
+      EIA_OUTBOX_SIGNING_SECRET: ${EIA_EVENT_SIGNING_SECRET:-local-event-signing-secret-change-me}
     depends_on:
       eia-postgres:
         condition: service_healthy
@@ -175,6 +201,9 @@ services:
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-eia}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-replace-me-local-only}
       SPRING_SQL_INIT_MODE: always
+      EIA_OUTBOX_ENABLED: "true"
+      EIA_OUTBOX_ENDPOINT: http://eia-event-ingest:8102/internal/events
+      EIA_OUTBOX_SIGNING_SECRET: ${EIA_EVENT_SIGNING_SECRET:-local-event-signing-secret-change-me}
     depends_on:
       eia-postgres:
         condition: service_healthy
@@ -208,6 +237,9 @@ services:
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-eia}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-replace-me-local-only}
       SPRING_SQL_INIT_MODE: always
+      EIA_OUTBOX_ENABLED: "true"
+      EIA_OUTBOX_ENDPOINT: http://eia-event-ingest:8102/internal/events
+      EIA_OUTBOX_SIGNING_SECRET: ${EIA_EVENT_SIGNING_SECRET:-local-event-signing-secret-change-me}
     depends_on:
       eia-postgres:
         condition: service_healthy
@@ -241,6 +273,9 @@ services:
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-eia}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-replace-me-local-only}
       SPRING_SQL_INIT_MODE: always
+      EIA_OUTBOX_ENABLED: "true"
+      EIA_OUTBOX_ENDPOINT: http://eia-event-ingest:8102/internal/events
+      EIA_OUTBOX_SIGNING_SECRET: ${EIA_EVENT_SIGNING_SECRET:-local-event-signing-secret-change-me}
     depends_on:
       eia-postgres:
         condition: service_healthy
@@ -274,6 +309,9 @@ services:
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-eia}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-replace-me-local-only}
       SPRING_SQL_INIT_MODE: always
+      EIA_OUTBOX_ENABLED: "true"
+      EIA_OUTBOX_ENDPOINT: http://eia-event-ingest:8102/internal/events
+      EIA_OUTBOX_SIGNING_SECRET: ${EIA_EVENT_SIGNING_SECRET:-local-event-signing-secret-change-me}
     depends_on:
       eia-postgres:
         condition: service_healthy
@@ -310,6 +348,9 @@ services:
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-eia}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-replace-me-local-only}
       SPRING_SQL_INIT_MODE: always
+      EIA_OUTBOX_ENABLED: "true"
+      EIA_OUTBOX_ENDPOINT: http://eia-event-ingest:8102/internal/events
+      EIA_OUTBOX_SIGNING_SECRET: ${EIA_EVENT_SIGNING_SECRET:-local-event-signing-secret-change-me}
     depends_on:
       eia-postgres:
         condition: service_healthy
@@ -346,6 +387,9 @@ services:
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-eia}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-replace-me-local-only}
       SPRING_SQL_INIT_MODE: always
+      EIA_OUTBOX_ENABLED: "true"
+      EIA_OUTBOX_ENDPOINT: http://eia-event-ingest:8102/internal/events
+      EIA_OUTBOX_SIGNING_SECRET: ${EIA_EVENT_SIGNING_SECRET:-local-event-signing-secret-change-me}
     depends_on:
       eia-postgres:
         condition: service_healthy
@@ -379,6 +423,9 @@ services:
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-eia}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-replace-me-local-only}
       SPRING_SQL_INIT_MODE: always
+      EIA_OUTBOX_ENABLED: "true"
+      EIA_OUTBOX_ENDPOINT: http://eia-event-ingest:8102/internal/events
+      EIA_OUTBOX_SIGNING_SECRET: ${EIA_EVENT_SIGNING_SECRET:-local-event-signing-secret-change-me}
     depends_on:
       eia-postgres:
         condition: service_healthy
@@ -412,6 +459,9 @@ services:
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-eia}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-replace-me-local-only}
       SPRING_SQL_INIT_MODE: always
+      EIA_OUTBOX_ENABLED: "true"
+      EIA_OUTBOX_ENDPOINT: http://eia-event-ingest:8102/internal/events
+      EIA_OUTBOX_SIGNING_SECRET: ${EIA_EVENT_SIGNING_SECRET:-local-event-signing-secret-change-me}
     depends_on:
       eia-postgres:
         condition: service_healthy

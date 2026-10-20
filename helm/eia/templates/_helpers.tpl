@@ -22,3 +22,10 @@ Database Secret name: an existing Secret wins, otherwise the chart-managed place
 {{- define "eia.dbSecretName" -}}
 {{- default "eia-db" .Values.postgres.auth.existingSecret -}}
 {{- end }}
+
+{{/*
+Event signing Secret name for the outbox HMAC secret.
+*/}}
+{{- define "eia.eventSigningSecretName" -}}
+{{- default "eia-event-signing" .Values.eventSigning.existingSecret -}}
+{{- end }}

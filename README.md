@@ -26,18 +26,19 @@ infrastructure, environments, observability, release, and security policy.
 ## Local stack status
 
 The Docker Desktop Linux engine and the minikube profile `minikube` are running, and the
-in-cluster stack has been deployed from `k8s/`. Recorded 2026-10-19 after adding the web
-remotes and the FS-RI simulator:
+in-cluster stack has been deployed from `k8s/`. Recorded 2026-10-20 after adding event-ingest,
+the outbox wiring, and the web remotes:
 
 | Check | Result |
 |---|---|
 | `docker version` | server 29.9.1 |
 | `minikube profile list` | profile `minikube`, driver docker, v1.37.0, Running |
-| Pods in `eia-local` | 37/37 Running and Ready |
-| Gateway smoke | 10/10 `/api/v1/*` routes HTTP 200 |
-| Federated UI | Playwright `tests/live-all.spec.js` with `EIA_LIVE=1`: 10/10 through `kubectl port-forward svc/eia-shell 3000:80` |
+| Pods in `eia-local` | 38/38 Running and Ready (includes `eia-event-ingest`) |
+| Gateway smoke | 10/10 `/api/v1/*` routes HTTP 200; `/api/v1/events/{stats,recent}` HTTP 200 |
+| Federated UI | Playwright `tests/live-all.spec.js` with `EIA_LIVE=1`: 11/11 through `kubectl port-forward svc/eia-shell 3000:80` |
 | FS-RI hand-off | cession `CES-000000001`: OPEN → RULE_APPLIED → `HANDED_OFF`, `fsriStatus=POSTED`, `FSRI-CES-DIRECT-000001` |
-| `scripts/validate.ps1` | PASS, 45 checks |
+| Outbox -> inbox | party `PTY-000000004` event `5bd6b801-6dca-540c-ab3f-2301e3527214`: outbox PUBLISHED, inbox PROCESSED, `signatureVerified=true` |
+| `scripts/validate.ps1` | PASS, 50 checks |
 
 The earlier blocker (the WSL2 optional component required a Windows restart before Docker
 Desktop's Linux engine and minikube could run) is resolved; the remediation was the recorded
@@ -81,7 +82,8 @@ pwsh ./scripts/build-images.ps1
 
 This runs `gradlew.bat bootJar -x test` in each owning repository and builds:
 
-- `eia/gateway:local`, `eia/auth:local`, `eia/config:local`, `eia/lineage:local`
+- `eia/gateway:local`, `eia/auth:local`, `eia/config:local`, `eia/lineage:local`,
+  `eia/event-ingest:local`
 - `eia/<vertical>-expert:local` and `eia/<vertical>-domain:local` for all ten verticals
 - `eia/<vertical>-web:local` for the ten federated web remotes (from each web repo's `dist/`)
 - `eia/fsri-simulator:local` for the FS-RI test double (from `repos/eia-quality`)
@@ -121,16 +123,16 @@ docker compose -f compose/docker-compose.yml ps
 docker compose -f compose/docker-compose.yml down
 ```
 
-The stack contains PostgreSQL, the four platform services, the shell, 20 vertical services,
-the ten federated web remotes, and the FS-RI simulator (37 containers). The shell is at
+The stack contains PostgreSQL, the five platform services, the shell, 20 vertical services,
+the ten federated web remotes, and the FS-RI simulator (38 containers). The shell is at
 <http://localhost:3000>; its nginx `/api` proxy forwards to the gateway and its
 `/remotes/<vertical>/` proxies forward to the web remotes. See
 [`compose/README.md`](compose/README.md).
 
 ## Kubernetes
 
-Plain manifests (namespace `eia-local`, 37 Deployments, 37 Services, 4 ConfigMaps, 1 Secret,
-1 PVC, 2 Ingresses):
+Plain manifests (namespace `eia-local`, 38 Deployments, 38 Services, 4 ConfigMaps,
+2 Secrets, 1 PVC, 2 Ingresses, 1 NetworkPolicy):
 
 ```powershell
 kubectl apply -k k8s
@@ -187,6 +189,7 @@ The shell exposes nginx `/healthz`.
 | Auth | 9000 | `/actuator/health` |
 | Config | 8888 | `/actuator/health` |
 | Lineage | 8101 | `/actuator/health` |
+| Event ingest | 8102 | `/actuator/health` |
 | Shell | 80 (Compose host 3000) | `/healthz` |
 | Party expert / domain | 8081 / 8082 | `/actuator/health` |
 | Policy expert / domain | 8083 / 8084 | `/actuator/health` |
@@ -203,7 +206,11 @@ The shell exposes nginx `/healthz`.
 | PostgreSQL | 5432 | `pg_isready` |
 
 The databases are `eia_party`, `eia_policy`, `eia_contract`, `eia_direct`, `eia_assumed`,
-`eia_cession`, `eia_retrocession`, `eia_document`, `eia_payment`, and `eia_notifications`.
+`eia_cession`, `eia_retrocession`, `eia_document`, `eia_payment`, `eia_notifications`, and
+`eia_platform` (event ingest inbox). All ten expert Deployments enable the transactional outbox
+with `EIA_OUTBOX_ENDPOINT=http://eia-event-ingest:8102/internal/events` and the shared
+`eia-event-signing` Secret; `/internal/events` is cluster-only (no Ingress path, NetworkPolicy
+on port 8102).
 
 ## Validation
 
@@ -220,20 +227,20 @@ The script runs these checks without a Docker engine or cluster:
    merge keys resolved), plus cross-file invariants for Compose, Dockerfiles, Kubernetes, and
    Helm; optionally parses the rendered kustomize and Helm output.
 
-Recorded after the web remotes and FS-RI simulator were added (2026-10-19):
+Recorded after the event-ingest service and outbox wiring were added (2026-10-20):
 
 ```text
 docker compose config ......... OK
-kubectl kustomize ............. 83 objects
+kubectl kustomize ............. 87 objects
 helm lint ..................... 1 chart linted, 0 failed
-helm template ................. 82 objects
-YAML parse .................... 29 files, 93 documents (PyYAML 6.0.3)
-Dockerfiles ................... 16 deployment Java + web-remote + FS-RI simulator + 9 owning-repository files OK
-Compose catalog ............... 37 services, ports/build contexts/FS-RI wiring OK
-Kubernetes .................... 37 Deployments, 37 Services, probes/Secrets/Ingress eia-remotes OK
-Helm .......................... ports, tags, files, 11 templates OK
-Rendered output ............... kustomize 83 objects, helm 82 objects; probes and ports OK
-RESULT: PASS - 45 checks
+helm template ................. 86 objects
+YAML parse .................... 30 files, 97 documents (PyYAML 6.0.3)
+Dockerfiles ................... 17 deployment Java + web-remote + FS-RI simulator + 9 owning-repository files OK
+Compose catalog ............... 38 services, ports/build contexts/FS-RI/outbox wiring OK
+Kubernetes .................... 38 Deployments, 38 Services, 2 Secrets, NetworkPolicy, Ingress OK
+Helm .......................... ports, tags, files, 12 templates OK
+Rendered output ............... kustomize 87 objects, helm 86 objects; probes and ports OK
+RESULT: PASS - 50 checks
 ```
 
 Kubernetes probes are defined for every Deployment: HTTP `/actuator/health` for Java services,
@@ -247,8 +254,9 @@ pods, read-only root filesystems, and a `/tmp` emptyDir.
 - Compose reads `POSTGRES_USER` / `POSTGRES_PASSWORD` from `compose/.env`; `.env` is ignored and
   `.env.example` is the committed local-only template.
 - `k8s/02-secret.yaml` and the Helm default create `eia-db` with
-  `POSTGRES_PASSWORD: replace-me-local-only`. `scripts/validate-yaml.py` asserts that this stays
-  a placeholder.
+  `POSTGRES_PASSWORD: replace-me-local-only`, plus `eia-event-signing` with a placeholder
+  `EIA_EVENT_SIGNING_SECRET` for outbox HMAC delivery. `scripts/validate-yaml.py` asserts that
+  both stay placeholders.
 - For anything shared or non-local, override `--set postgres.auth.password`, supply
   `postgres.auth.existingSecret`, or replace the Secret out of band. Secret management and
   90-day rotation are required by SPEC section 14.12.3.

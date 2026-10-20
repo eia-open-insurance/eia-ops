@@ -65,6 +65,18 @@ platform:
       repository: eia/lineage
       tag: local
     port: 8101
+  event-ingest:
+    image:
+      repository: eia/event-ingest
+      tag: local
+    port: 8102
+    database: eia_platform
+
+# Shared HMAC-SHA256 secret for outbox delivery (SPEC 7.5.1). Set
+# existingSecret to use an externally managed Secret with the same key.
+eventSigning:
+  existingSecret: ""
+  secret: local-event-signing-secret-change-me
 
 verticals:
   party:

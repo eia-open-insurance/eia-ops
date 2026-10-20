@@ -9,9 +9,10 @@ Helm is the templated alternative in [`../helm/eia`](../helm/eia/README.md).
 |---|---|
 | `00-namespace.yaml` | Namespace `eia-local` |
 | `01-configmap.yaml` | Gateway routes/CORS, Config Server placeholder, shell nginx config |
-| `02-secret.yaml` | `eia-db` placeholder Secret (local only) |
+| `02-secret.yaml` | `eia-db` and `eia-event-signing` placeholder Secrets (local only) |
 | `10-postgres.yaml` | Init script ConfigMap, 1Gi PVC, PostgreSQL Deployment, Service |
 | `20-platform.yaml` | gateway, auth, config, lineage Deployments and Services |
+| `21-event-ingest.yaml` | `eia-event-ingest` Deployment/Service (8102), cluster-only NetworkPolicy |
 | `30-shell.yaml` | Shell Deployment and Service |
 | `31-web.yaml` | Ten federated web-remote Deployments and Services (`eia-<vertical>-web`, port 80) |
 | `36-fsri-simulator.yaml` | FS-RI simulator `eia-fsri-simulator` Deployment and Service (port 8181) |
@@ -39,7 +40,13 @@ sets `imagePullPolicy: IfNotPresent`. Use `scripts/deploy-kind.ps1` or
   localhost targets that ship inside the gateway jar with Kubernetes Service names.
 - **Database**: one PostgreSQL pod; the init ConfigMap creates `eia_party`, `eia_policy`,
   `eia_contract`, `eia_direct`, `eia_assumed`, `eia_cession`, `eia_retrocession`,
-  `eia_document`, `eia_payment`, and `eia_notifications`.
+  `eia_document`, `eia_payment`, `eia_notifications`, and `eia_platform`.
+- **Eventing**: `eia-event-ingest` owns the `eia_platform` inbox on port 8102. The gateway
+  routes `/api/v1/events/**` to it for the dashboard; `POST /internal/events` is not published
+  through the Ingress and a NetworkPolicy admits only platform pods in `eia-local`. All ten
+  expert Deployments set `EIA_OUTBOX_ENABLED=true`, endpoint
+  `http://eia-event-ingest:8102/internal/events`, and the shared `EIA_EVENT_SIGNING_SECRET`
+  from Secret `eia-event-signing`.
 - **Storage**: the PVC omits `storageClassName` and uses the cluster default. If the cluster
   has no default StorageClass (or for kind/minikube with a specific class), set
   `storageClassName` explicitly in `10-postgres.yaml`.

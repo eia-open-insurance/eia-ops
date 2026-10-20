@@ -8,8 +8,8 @@ Runs five independent checks:
   2. kubectl kustomize k8s                (offline Kubernetes render)
   3. helm lint + helm template            (offline Helm render, when Helm is installed)
   4. python scripts/validate-yaml.py      (YAML parse, duplicate keys, cross-file invariants)
-  5. rendered-output checks in validate-yaml.py (37 Deployments/Services, probes, ports,
-     both Ingresses)
+  5. rendered-output checks in validate-yaml.py (38 Deployments/Services, probes, ports,
+     both Ingresses, the event-ingest NetworkPolicy)
 
 PyYAML 6.0.3 is already installed in this workspace's Python 3.12.
 No Docker engine, cluster, or network access is required.

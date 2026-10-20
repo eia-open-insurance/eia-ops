@@ -107,6 +107,7 @@ $script:JavaServices = @(
     [pscustomobject]@{ Name = 'auth'; Repo = 'eia-platform/auth'; GradleDir = 'eia-platform'; GradleTask = ':auth:bootJar'; JarPattern = 'auth-*-SNAPSHOT.jar'; Dockerfile = 'images/platform/auth.Dockerfile'; Port = 9000 }
     [pscustomobject]@{ Name = 'config'; Repo = 'eia-platform/config'; GradleDir = 'eia-platform'; GradleTask = ':config:bootJar'; JarPattern = 'config-*-SNAPSHOT.jar'; Dockerfile = 'images/platform/config.Dockerfile'; Port = 8888 }
     [pscustomobject]@{ Name = 'lineage'; Repo = 'eia-platform/lineage'; GradleDir = 'eia-platform'; GradleTask = ':lineage:bootJar'; JarPattern = 'lineage-*-SNAPSHOT.jar'; Dockerfile = 'images/platform/lineage.Dockerfile'; Port = 8101 }
+    [pscustomobject]@{ Name = 'event-ingest'; Repo = 'eia-platform/event-ingest'; GradleDir = 'eia-platform'; GradleTask = ':event-ingest:bootJar'; JarPattern = 'event-ingest-*-SNAPSHOT.jar'; Dockerfile = 'images/platform/event-ingest.Dockerfile'; Port = 8102 }
 
     [pscustomobject]@{ Name = 'party-expert'; Repo = 'eia-party-expert'; GradleDir = 'eia-party-expert'; GradleTask = 'bootJar'; JarPattern = 'eia-party-expert-*-SNAPSHOT.jar'; Dockerfile = 'images/verticals/party-expert.Dockerfile'; Port = 8081 }
     [pscustomobject]@{ Name = 'party-domain'; Repo = 'eia-party-domain'; GradleDir = 'eia-party-domain'; GradleTask = 'bootJar'; JarPattern = 'eia-party-domain-*-SNAPSHOT.jar'; Dockerfile = 'images/verticals/party-domain.Dockerfile'; Port = 8082 }

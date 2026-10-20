@@ -7,6 +7,8 @@ Dockerfiles used by the local build scripts, because the owning files cannot be 
 - `eia-platform/{gateway,auth,config,lineage}/Dockerfile` copy `target/*.jar`, but the Gradle
   build writes `build/libs/*-SNAPSHOT.jar`; `auth`, `config`, and `lineage` also `EXPOSE 8080`
   instead of their real ports (`9000`, `8888`, `8101`).
+- `eia-platform/event-ingest` is built from its Gradle `build/libs` output through
+  `images/platform/event-ingest.Dockerfile` (port 8102).
 - Six verticals (`assumed-claims`, `contract`, `direct-claims`, `party`, `retrocession`)
   copy `target/*.jar` and expose `8080` on both tiers instead of their real ports.
 - `eia-document-{domain,expert}/Dockerfile` use `build/libs/*.jar`, which matches both the
@@ -29,6 +31,7 @@ The context must be the component directory, because each Dockerfile copies `bui
 | `eia/auth:local` | `repos/eia-platform/auth` | `repos/eia-ops/images/platform/auth.Dockerfile` | 9000 |
 | `eia/config:local` | `repos/eia-platform/config` | `repos/eia-ops/images/platform/config.Dockerfile` | 8888 |
 | `eia/lineage:local` | `repos/eia-platform/lineage` | `repos/eia-ops/images/platform/lineage.Dockerfile` | 8101 |
+| `eia/event-ingest:local` | `repos/eia-platform/event-ingest` | `repos/eia-ops/images/platform/event-ingest.Dockerfile` | 8102 |
 | `eia/party-expert:local` | `repos/eia-party-expert` | `repos/eia-ops/images/verticals/party-expert.Dockerfile` | 8081 |
 | `eia/party-domain:local` | `repos/eia-party-domain` | `repos/eia-ops/images/verticals/party-domain.Dockerfile` | 8082 |
 | `eia/policy-expert:local` | `repos/eia-policy-expert` | `repos/eia-policy-expert/Dockerfile` | 8083 |

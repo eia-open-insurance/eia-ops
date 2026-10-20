@@ -1,7 +1,8 @@
 # eia Helm chart
 
-Single-cluster local deployment of the platform, shell, PostgreSQL, the 20 implemented
-vertical services, the ten federated web remotes, and the FS-RI simulator test double.
+Single-cluster local deployment of the platform (including event ingest), shell, PostgreSQL,
+the 20 implemented vertical services, the ten federated web remotes, and the FS-RI simulator
+test double.
 
 ## Commands
 
@@ -36,13 +37,17 @@ helm upgrade --install eia helm/eia --namespace eia-local `
   set `EIA_FSRI_BASE_URL` for the two reinsurance-administration domains.
 - `postgres.auth` for local credentials; the placeholder is created only when
   `existingSecret` is empty.
+- `eventSigning.secret` (or `eventSigning.existingSecret`) is the shared HMAC secret used by
+  the ten expert outboxes and `eia-event-ingest`; `platform.event-ingest.database` defaults to
+  `eia_platform`.
 - `ingress.*` for the host, annotations, and the `/remotes` prefix used by the
   second Ingress (`eia-remotes`) whose regex rewrite strips the prefix.
 - `resources`, `replicaCount`, and `global.javaToolOptions` for sizing.
 
-The chart renders the same workload set as `k8s/`: 37 Deployments, 37 Services, 4 ConfigMaps,
-1 Secret, 1 PVC, and 2 Ingresses. The Namespace is created by `--create-namespace` and is not a
-chart resource, which avoids Helm ownership conflicts on reinstall.
+The chart renders the same workload set as `k8s/`: 38 Deployments, 38 Services, 4 ConfigMaps,
+2 Secrets, 1 PVC, 2 Ingresses, and 1 NetworkPolicy. The Namespace is created by
+`--create-namespace` and is not a chart resource, which avoids Helm ownership conflicts on
+reinstall.
 
 ## Notes
 

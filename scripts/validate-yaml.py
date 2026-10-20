@@ -24,6 +24,7 @@ PLATFORM = {
     "auth": 9000,
     "config": 8888,
     "lineage": 8101,
+    "event-ingest": 8102,
 }
 
 VERTICALS = {
@@ -65,6 +66,7 @@ OPS_DOCKERFILES = {
     "auth": ("images/platform/auth.Dockerfile", 9000),
     "config": ("images/platform/config.Dockerfile", 8888),
     "lineage": ("images/platform/lineage.Dockerfile", 8101),
+    "event-ingest": ("images/platform/event-ingest.Dockerfile", 8102),
     "party-expert": ("images/verticals/party-expert.Dockerfile", 8081),
     "party-domain": ("images/verticals/party-domain.Dockerfile", 8082),
     "contract-expert": ("images/verticals/contract-expert.Dockerfile", 8085),
@@ -247,6 +249,15 @@ def check_compose(root: Path, report: Report):
         if str(env.get("SPRING_SQL_INIT_MODE")) != "always":
             env_ok = False
             report.fail(f"eia-{vertical}-expert: SPRING_SQL_INIT_MODE is not always")
+        if str(env.get("EIA_OUTBOX_ENABLED")) != "true":
+            env_ok = False
+            report.fail(f"eia-{vertical}-expert: EIA_OUTBOX_ENABLED is not true")
+        if env.get("EIA_OUTBOX_ENDPOINT") != "http://eia-event-ingest:8102/internal/events":
+            env_ok = False
+            report.fail(f"eia-{vertical}-expert: EIA_OUTBOX_ENDPOINT is wrong")
+        if "${EIA_EVENT_SIGNING_SECRET:-" not in str(env.get("EIA_OUTBOX_SIGNING_SECRET")):
+            env_ok = False
+            report.fail(f"eia-{vertical}-expert: EIA_OUTBOX_SIGNING_SECRET is not the shared secret")
         domain = services.get(f"eia-{vertical}-domain", {})
         raw = domain.get("environment", {}).get("SPRING_APPLICATION_JSON")
         try:
@@ -258,6 +269,15 @@ def check_compose(root: Path, report: Report):
             env_ok = False
             report.fail(f"eia-{vertical}-domain: SPRING_APPLICATION_JSON invalid ({exc})")
     report.require(env_ok, "domain/expert environment bindings match the service catalog")
+
+    ingest = services.get("eia-event-ingest", {})
+    ingest_env = ingest.get("environment", {})
+    ingest_ok = (
+        ingest_env.get("SPRING_DATASOURCE_URL") == "jdbc:postgresql://eia-postgres:5432/eia_platform"
+        and str(ingest_env.get("SPRING_SQL_INIT_MODE")) == "always"
+        and "${EIA_EVENT_SIGNING_SECRET:-" in str(ingest_env.get("EIA_EVENT_SIGNING_SECRET"))
+    )
+    report.require(ingest_ok, "event-ingest uses eia_platform and the shared signing secret")
 
     fsri_ok = True
     for vertical in ("cession", "retrocession"):
@@ -472,6 +492,54 @@ def check_kubernetes(root: Path, report: Report):
         "Secret eia-db is a placeholder, not a real credential",
     )
 
+    secrets = {obj["metadata"]["name"]: obj for obj in kinds.get("Secret", [])}
+    signing_secret = secrets.get("eia-event-signing", {}).get("stringData", {})
+    report.require(
+        len(secrets) == 2
+        and "change-me" in str(signing_secret.get("EIA_EVENT_SIGNING_SECRET", "")),
+        "Secret eia-event-signing is a local placeholder for the outbox HMAC secret",
+    )
+
+    outbox_ok = True
+    for vertical in VERTICALS:
+        container = deployments[f"eia-{vertical}-expert"]["spec"]["template"]["spec"]["containers"][0]
+        env = {item["name"]: item for item in container.get("env", [])}
+        if str(env.get("EIA_OUTBOX_ENABLED", {}).get("value")) != "true":
+            outbox_ok = False
+            report.fail(f"eia-{vertical}-expert: EIA_OUTBOX_ENABLED is not true")
+        if env.get("EIA_OUTBOX_ENDPOINT", {}).get("value") != "http://eia-event-ingest:8102/internal/events":
+            outbox_ok = False
+            report.fail(f"eia-{vertical}-expert: EIA_OUTBOX_ENDPOINT is wrong")
+        key_ref = env.get("EIA_OUTBOX_SIGNING_SECRET", {}).get("valueFrom", {}).get("secretKeyRef", {})
+        if key_ref.get("name") != "eia-event-signing" or key_ref.get("key") != "EIA_EVENT_SIGNING_SECRET":
+            outbox_ok = False
+            report.fail(f"eia-{vertical}-expert: EIA_OUTBOX_SIGNING_SECRET does not use the shared Secret")
+    report.require(outbox_ok, "all ten expert Deployments enable the outbox against event-ingest")
+
+    ingest_container = deployments["eia-event-ingest"]["spec"]["template"]["spec"]["containers"][0]
+    ingest_env = {item["name"]: item for item in ingest_container.get("env", [])}
+    ingest_key_ref = ingest_env.get("EIA_EVENT_SIGNING_SECRET", {}).get("valueFrom", {}).get("secretKeyRef", {})
+    report.require(
+        ingest_env.get("SPRING_DATASOURCE_URL", {}).get("value")
+        == "jdbc:postgresql://eia-postgres:5432/eia_platform"
+        and ingest_key_ref.get("name") == "eia-event-signing",
+        "event-ingest Deployment uses eia_platform and the shared signing Secret",
+    )
+
+    policies = {obj["metadata"]["name"]: obj for obj in kinds.get("NetworkPolicy", [])}
+    policy = policies.get("eia-event-ingest", {})
+    policy_ports = [
+        port.get("port")
+        for rule in policy.get("spec", {}).get("ingress", [])
+        for port in rule.get("ports", [])
+    ]
+    report.require(
+        policy.get("spec", {}).get("podSelector", {}).get("matchLabels", {}).get("app.kubernetes.io/name")
+        == "eia-event-ingest"
+        and 8102 in policy_ports,
+        "event-ingest NetworkPolicy admits only the inbox port from namespace pods",
+    )
+
     ingresses = {obj["metadata"]["name"]: obj for obj in kinds.get("Ingress", [])}
     ingress = ingresses.get("eia", {})
     rules = ingress.get("spec", {}).get("rules", [])
@@ -649,11 +717,13 @@ def main():
     check_kubernetes(root, report)
     check_helm(root, report)
     if args.kubectl_rendered:
-        # Deployments + Services + 4 ConfigMaps + Secret + PVC + Namespace + 2 Ingresses.
-        check_rendered(args.kubectl_rendered, "kubectl kustomize", report, len(expected_images()) * 2 + 9)
+        # Deployments + Services + 4 ConfigMaps + 2 Secrets + PVC + Namespace
+        # + 2 Ingresses + NetworkPolicy.
+        check_rendered(args.kubectl_rendered, "kubectl kustomize", report, len(expected_images()) * 2 + 11)
     if args.helm_rendered:
-        # Deployments + Services + 4 ConfigMaps + Secret + PVC + 2 Ingresses (no Namespace).
-        check_rendered(args.helm_rendered, "helm template", report, len(expected_images()) * 2 + 8)
+        # Deployments + Services + 4 ConfigMaps + 2 Secrets + PVC + 2 Ingresses
+        # + NetworkPolicy (no Namespace).
+        check_rendered(args.helm_rendered, "helm template", report, len(expected_images()) * 2 + 10)
 
     print()
     if report.failures:

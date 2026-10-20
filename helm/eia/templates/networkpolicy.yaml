@@ -1,0 +1,26 @@
+# Defense in depth for the event inbox: the internal endpoint on port 8102 is
+# reachable only from platform pods in the same namespace. The Ingress never
+# publishes /internal.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: eia-event-ingest
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: eia-event-ingest
+    app.kubernetes.io/component: platform
+    {{- include "eia.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: eia-event-ingest
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: eia-open-insurance
+      ports:
+        - protocol: TCP
+          port: {{ (index .Values.platform "event-ingest").port }}

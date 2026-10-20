@@ -71,6 +71,10 @@ spring:
           uri: http://eia-lineage:8101
           predicates:
             - Path=/api/v1/lineage/**
+        - id: event-ingest
+          uri: http://eia-event-ingest:8102
+          predicates:
+            - Path=/api/v1/events/**
 management:
   endpoints:
     web:

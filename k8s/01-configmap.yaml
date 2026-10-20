@@ -82,6 +82,10 @@ data:
               uri: http://eia-lineage:8101
               predicates:
                 - Path=/api/v1/lineage/**
+            - id: event-ingest
+              uri: http://eia-event-ingest:8102
+              predicates:
+                - Path=/api/v1/events/**
     management:
       endpoints:
         web:
@@ -204,6 +208,11 @@ data:
             proxy_pass http://eia-notifications-web:80/;
             proxy_http_version 1.1;
             proxy_set_header Host $host;
+        }
+
+        # Event inbox is cluster-internal: never proxy or SPA-fallback /internal.
+        location /internal/ {
+            return 404;
         }
 
         location / {
