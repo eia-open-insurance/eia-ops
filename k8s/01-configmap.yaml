@@ -15,6 +15,11 @@ data:
     # Mounted at /app/config/application.yml; Spring Boot loads it ahead of the classpath copy.
     server:
       port: 8080
+    eia:
+      auth:
+        enabled: true
+        issuer: http://localhost:3000/auth
+        jwks-uri: http://eia-auth:9000/oauth2/jwks
     spring:
       application:
         name: eia-gateway
@@ -150,6 +155,21 @@ data:
             access_log off;
             add_header Content-Type text/plain;
             return 200 "ok\n";
+        }
+
+        location = /auth-config.js {
+            access_log off;
+            add_header Content-Type application/javascript;
+            return 200 "window.__EIA_AUTH_ENABLED__ = true;\n";
+        }
+
+        location /auth/ {
+            proxy_pass http://eia-auth:9000/;
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
         }
 
         location /api/ {

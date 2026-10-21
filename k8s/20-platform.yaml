@@ -138,6 +138,8 @@ spec:
           env:
             - name: JAVA_TOOL_OPTIONS
               value: "-Xms32m -Xmx256m -XX:+UseSerialGC"
+            - name: EIA_AUTH_ISSUER
+              value: http://localhost:3000/auth
           resources:
             requests:
               cpu: 50m
