@@ -54,6 +54,10 @@ data:
               uri: http://eia-policy-domain:8084
               predicates:
                 - Path=/api/v1/programs/**
+            - id: policy-legal-entities
+              uri: http://eia-policy-domain:8084
+              predicates:
+                - Path=/api/v1/legal-entities/**
             - id: contract
               uri: http://eia-contract-domain:8086
               predicates:
