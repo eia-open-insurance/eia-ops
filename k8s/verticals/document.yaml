@@ -58,6 +58,10 @@ spec:
                 secretKeyRef:
                   name: eia-event-signing
                   key: EIA_EVENT_SIGNING_SECRET
+            - name: EIA_DOCUMENT_RETENTION_ENABLED
+              value: "true"
+            - name: EIA_DOCUMENT_RETENTION_CRON
+              value: "0 0 2 * * ?"
           resources:
             requests:
               cpu: 50m
